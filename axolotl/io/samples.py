@@ -4,7 +4,7 @@
 
 spark = SparkSession.builder.getOrCreate()
 
-from sparc.samples import *
+from axolotl.io.samples import *
 
 input_seq = 's3://share.jgi-ga.org/gis20mock/illumina.seq'
 sample1 = Sample(sampleId=0, sampleName='test')
@@ -24,14 +24,9 @@ import pyspark.sql.functions as F
 from pyspark.sql.types import *
 from functools import reduce
 import os, re
-from sparc.reads import *
+from axolotl.io.reads import *
 
-def clean_up_read(seq):
-        """
-        replace non AGCT bases to N
-        """
-        return re.sub("[^AGCT]+", "N", seq)
-clean_up_read_udf = F.udf(lambda x: clean_up_read(x), StringType())
+
 
 def allowed_extensions(filename):
     """

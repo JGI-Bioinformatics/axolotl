@@ -5,7 +5,7 @@
 
 # testing 
 
-from sparc.lclusters import *
+from axolotl.cluster.lclusters import *
 output_prefix = 'dbfs:/mnt/gis20mock/gis20mock/pacbio_test'
 min_reads_per_cluster=2 # clusters with fewer numbers will be ignored
 
@@ -24,9 +24,9 @@ dbutils.fs.rm(checkpoint_dir,True)
 """
 from pyspark.sql import SparkSession
 import pyspark.sql.functions as F
-from sparc.wlpa import *
-from sparc.utils import *
-from sparc.evaluation import *
+from axolotl.cluster.wlpa import *
+from axolotl.utils.utils import *
+from axolotl.cluster.evaluation import *
 
 
 def local_clustering(output_prefix,

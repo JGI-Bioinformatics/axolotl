@@ -5,9 +5,8 @@
 
 # testing 
 
-from sparc.samples import *
-from sparc.edgegen import *
-from pyspark.sql.types import *
+from axolotl.io.samples import *
+from axolotl.cluster.edgegen import *
 
 spark = SparkSession.builder.getOrCreate()
 
@@ -31,9 +30,6 @@ from pyspark.sql import DataFrame
 import pyspark.sql.functions as F
 from pyspark.sql.types import *
 from functools import reduce
-
-from sparc.utils import *
-from sparc.evaluation import * 
 
 
 def edge_gen(output_prefix,

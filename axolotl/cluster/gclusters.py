@@ -6,8 +6,8 @@
 from pyspark.sql.functions import *
 from pyspark.sql.types import *
 
-from sparc.samples import *
-from sparc.gclusters import *
+from axolotl.io.samples import *
+from axolotl.cluster.gclusters import *
 # java udf kmer function
 spark.udf.registerJavaFunction("jkmerudf", "org.jgi.spark.udf.jkmer", ArrayType(LongType()))
 # need to install umap
@@ -59,9 +59,9 @@ import matplotlib.pyplot as plt
 from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import DBSCAN
 
-from sparc.samples import *
-from sparc.utils import *
-from sparc.evaluation import *
+from axolotl.io.samples import *
+from axolotl.utils.utils import *
+from axolotl.cluster.evaluation import *
 
 def global_clustering(output_prefix,
                     samples='', # samples

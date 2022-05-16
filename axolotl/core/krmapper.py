@@ -11,8 +11,8 @@
 spark = SparkSession.builder.getOrCreate()
 spark.udf.registerJavaFunction("jkmerudf", "org.jgi.spark.udf.jkmer", ArrayType(LongType()))
 
-from sparc.krmapper import *
-from sparc.samples import *
+from axolotl.core.krmapper import *
+from axolotl.io.samples import *
 
 input_seq = 'dbfs:/mnt/gis20mock/gis20mock/pacbio.seq'
 datapath = 'dbfs:/mnt/gis20mock/gis20mock/pacbio_'

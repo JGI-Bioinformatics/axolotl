@@ -4,9 +4,9 @@ PySPark implementation of weighted LPA
 # create checkpoint dir:
 spark.sparkContext.setCheckpointDir('dbfs:/tmp/checkpoint')
 
-from sparc.samples import *
-from sparc.edgegen import *
-from spark.wlpa import *
+from axolotl.io.samples import *
+from axolotl.cluster.edgegen import *
+from axolotl.cluster.wlpa import *
 
 min_edge_weight=2 # minimum number of shared kmers/minimizers between a pairs of reads to draw an edge
 min_reads_per_cluster=2 # clusters with fewer numbers will be ignored
