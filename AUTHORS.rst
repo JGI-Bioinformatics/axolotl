@@ -11,5 +11,4 @@ Contributors
 ------------
 
 * Bryce Foster <brycefoster@lbl.gov>
-* Dino Cat <dino@lbl.gov>
 

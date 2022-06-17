@@ -11,7 +11,6 @@ TODO:
 
 
 """
-from pyspark.sql import SparkSession
 import pyspark.sql.functions as F
 
 def save_parquet(df, output_prefix, output_suffix, sort_col='', overwrite=True):

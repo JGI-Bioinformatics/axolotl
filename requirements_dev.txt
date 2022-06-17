@@ -10,3 +10,12 @@ twine==1.14.0
 
 pytest==6.2.4
 black==21.7b0
+
+numpy=1.22.4
+pandas=1.4.2 
+pytz=2022.1
+
+boto3=1.24.11
+botocore=1.27.11
+jmespath=1.0.0
+s3transfer=0.6.0
