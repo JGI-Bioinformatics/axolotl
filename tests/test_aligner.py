@@ -3,37 +3,24 @@
 """Tests for `axolotl` aligner function."""
 
 import pytest
-
+import yaml
+import tests.test_spark_env
 
 from axolotl.aligner.aligner import seq_align
-from pyspark.sql import SparkSession
-spark = SparkSession.getOrCreate()
 
-@pytest.fixture
-def short_reads():
-    """parquet-format reads converted from fasta and fastq format"""
-    reads_seq = {
-        'fa' : '',
-        'fq' : ''
-    }
-    return reads_seq
+def read_yaml(file_path): 
+    """read config file"""
+    with open(file_path, "r") as f:
+        return yaml.safe_load(f)
 
-@pytest.fixture
-def aligners():
-    """aligner strings"""
-    aligners = {
-        'minmap2' : '',
-        'bbmap' : ''
-    }
-    return aligners
-
-def test_content(short_reads, aligners):
+@pytest.mark.usefixtures("spark_session")
+def test_aligner(spark_session):
     """Testing aligner function."""
-    for format, path in short_reads.items():
-        reads = spark.read.parquet(path)
-        for aligner, command in aligners.items():
-            try:
-                seq_align(reads, command, format=format)
-                print('Testing aligner "%s" on %s format... Passed' % (aligner, format))
-            except:
-                print('Testing aligner "%s" on %s format... Failed' % (aligner, format))
+    my_testing = read_yaml('../config.yml')
+    for format, path in my_testing['reads']:
+        reads = spark_session.read.parquet(path)
+        for aligner, command in my_testing['aligners']:
+            aligned = seq_align(reads, command, format=format).count()
+            assert aligned >0, f"Aligner:{aligner} on {format} format produced number of alignments greater than 0 expected, got: {aligned}"
+
+

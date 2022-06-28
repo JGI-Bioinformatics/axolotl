@@ -10,6 +10,8 @@ twine==1.14.0
 
 pytest==6.2.4
 black==21.7b0
+yaml==0.2.5
+pyyaml=6.0
 
 numpy=1.22.4
 pandas=1.4.2 

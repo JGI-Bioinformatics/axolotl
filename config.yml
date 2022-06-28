@@ -1,0 +1,20 @@
+---
+# app-level configurations
+DEBUG : true
+
+# paths to common aligners
+aligners:
+  BBMAP : "" # complete command to run bbmap from stdin 
+  MINIMAP2 : "" # complete command to run minimap2 from stdin
+
+#TEST REFERENCE
+reference:
+  genome:
+    SMALL : "" # a small genome in fasta/gz format
+    MEDIUM : "" # a medium genome in fasta/gz format
+    META : "" # a small metagenome in fasta/gz format
+
+#TESTREADS
+reads:
+  short: "" # short reads in seq format
+  long : "" # long reads in seq format
