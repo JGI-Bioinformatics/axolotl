@@ -52,7 +52,8 @@ def fastq_to_csv(input_fastq_file, csv_file, pairs=True, overwrite=False):
           subprocess.call(paste, stdin=ps.stdout, stdout=f)
           ps.wait()
       else:
-          ps = subprocess.call( paste + [input_fastq_file], stdout=f) 
+          ps = subprocess.Popen(['cat', input_fastq_file], stdout=subprocess.PIPE)
+          subprocess.call(paste, stdin=ps.stdout, stdout=f) 
           ps.wait()
 
 def fastq_to_seq(output_pq_file, read1, read2=None, pairs=True, joinpair=False, overwrite=True, temp_dir='/local_disk0/tmp/'):

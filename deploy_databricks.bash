@@ -8,7 +8,7 @@ VERSION=$1
 ClusterID=$2
 # python
 deploydir="dbfs:/FileStore/site_python"
-deploy="sparc-${VERSION}-py3-none-any.whl"
+deploy="axolotl-${VERSION}-py2.py3-none-any.whl"
  
 rm -rf build/ dist/ axolotl.egg-info/
 python setup.py bdist_wheel
