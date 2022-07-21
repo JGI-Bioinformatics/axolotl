@@ -23,22 +23,8 @@ from pyspark.sql import DataFrame, SparkSession
 import pyspark.sql.functions as F
 from pyspark.sql.types import *
 from functools import reduce
-import os, re
-from axolotl.io.reads import *
-
-
-
-def allowed_extensions(filename):
-    """
-    allowed file extensions
-    """
-    allowed = ['fa', 'fq', 'seq']
-    if filename.split('.')[-1] == 'gz':
-        filename = '.'.join(filename.split('.')[0:-1])
-    if filename.split('.')[-1] in allowed:
-        return True
-    else:
-        return False
+from axolotl.io.reads import fastq_to_seq, fasta_to_seq, clean_up_read_udf
+from axolotl.io.cloudFS import get_cloud_filelist
 
 def reads_to_df(read1, read2=None, format='fq', max_reads=0, joinpair=False):
     """
@@ -116,25 +102,11 @@ class Sample:
         """  
         files = []
         for input_seq in read1:
-            if input_seq[0:5] == 's3://':
-                files += process_aws_files(input_seq, max_files=max_files)
-            elif input_seq[0:5] == 'gs://':
-                files += process_gcs_files(input_seq, max_files=max_files)                  
-            elif input_seq[0:6] == 'dbfs:/':
-                files += process_dbfs_files(input_seq, max_files=max_files)           
-            else:
-                files += process_unix_files(input_seq, max_files=max_files)
+            files += get_cloud_filelist(input_seq, max_files=max_files)
         if read2:
             files2 = []               
             for input_seq in read2:
-                if input_seq[0:5] == 's3://':
-                    files2 += process_aws_files(input_seq, max_files=max_files)
-                elif input_seq[0:5] == 'gs://':
-                    files2 += process_gcs_files(input_seq, max_files=max_files)                  
-                elif input_seq[0:6] == 'dbfs:/':
-                    files2 += process_dbfs_files(input_seq, max_files=max_files)           
-                else:
-                    files2 += process_unix_files(input_seq, max_files=max_files)
+                files2 += get_cloud_filelist(input_seq, max_files=max_files)
         else:
             files2 = [] 
         self.update_or_add('read1', files)
@@ -205,60 +177,3 @@ class Sample:
         # save metafile
         meta_path = datapath + 'meta.json'
         spark.sparkContext.parallelize(metadata).toDF().write.mode("overwrite").json(meta_path)
-     
-
-def process_aws_files(input_seq, max_files=0):
-    #
-    import boto3
-    bucket = input_seq.replace('s3://', '').split('/')[0]
-    key = '/'.join(input_seq.replace('s3://', '').split('/')[1:])
-    my_bucket = boto3.resource('s3').Bucket(bucket)
-    counter = 0
-    files = []
-    for f in my_bucket.objects.filter(Prefix=key):
-        if allowed_extensions(f.key):
-            files.append('s3a://' + bucket + '/' + f.key)
-            counter +=1
-            if (max_files>0) and (counter >= max_files):
-                break
-    return files
-
-def process_gcs_files(input_seq, max_files=0):
-    from google.cloud import storage
-    bucket = input_seq.replace('gs://', '').split('/')[0]
-    key = '/'.join(input_seq.replace('gs://', '').split('/')[1:])
-    client = storage.Client()
-    files = []
-    counter = 0
-    for f in client.list_blobs(bucket, prefix=key):
-        if allowed_extensions(f.name):
-            files.append('gs://' + bucket + '/' + f.name)
-            counter +=1
-            if (max_files>0) and (counter >= max_files):
-                break    
-    return files
-
-def process_dbfs_files(input_seq, max_files=0):
-    from pyspark.dbutils import DBUtils
-    spark = SparkSession.getActiveSession()
-    dbutils = DBUtils(spark)
-    counter = 0
-    files=[]
-    for f in dbutils.fs.ls(input_seq):
-        if allowed_extensions(f.name):
-            files.append(f.path)
-            counter +=1
-            if (max_files>0) and (counter >= max_files):
-                break   
-    return files
-
-def process_unix_files(input_seq, max_files=0):
-    counter = 0
-    files = []
-    for f in os.listdir(input_seq):
-        if allowed_extensions(f):
-            files.append('/'.join([input_seq, f]))
-            counter +=1
-            if (max_files>0) and (counter >= max_files):
-                break  
-    return files

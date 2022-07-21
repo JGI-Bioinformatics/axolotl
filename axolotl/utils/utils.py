@@ -4,7 +4,7 @@
 
 """
 from pyspark.sql.types import FloatType,StringType
-
+from pyspark.sql import SparkSession
 from collections import Counter
 import operator, math
 
@@ -52,4 +52,14 @@ def print_common(x) -> StringType():
             common += ':'.join([str(e) for e in c]) + ','
         return common      
 
-
+def get_dbutils():
+    """
+    provides DBUtils
+    """
+    try:
+        from pyspark.dbutils import DBUtils
+        dbutils = DBUtils(SparkSession.getActiveSession())
+    except ImportError:
+        import IPython
+        dbutils = IPython.get_ipython().user_ns["dbutils"]
+    return dbutils
