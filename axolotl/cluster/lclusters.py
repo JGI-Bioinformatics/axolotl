@@ -27,6 +27,7 @@ import pyspark.sql.functions as F
 from axolotl.cluster.wlpa import *
 from axolotl.utils.utils import *
 from axolotl.cluster.evaluation import *
+from axolotl.io.parquetio import save_parquet
 
 
 def local_clustering(output_prefix,

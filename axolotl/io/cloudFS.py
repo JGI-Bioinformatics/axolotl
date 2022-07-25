@@ -14,7 +14,7 @@ def allowed_extensions(filename):
     """
     allowed file extensions
     """
-    allowed = ['fa', 'fq', 'seq']
+    allowed = ['fa', 'fq', 'seq', 'fasta', 'fastq']
     if filename.split('.')[-1] == 'gz':
         filename = '.'.join(filename.split('.')[0:-1])
     if filename.split('.')[-1] in allowed:

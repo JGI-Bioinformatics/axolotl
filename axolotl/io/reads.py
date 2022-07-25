@@ -83,12 +83,15 @@ def fastq_to_seq(output_pq_file, read1, read2=None, pairs=True, joinpair=False, 
     temp_file1 = temp_dir + ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(8))
     if read1[0:5] == 'dbfs:':
         read1 = read1.replace('dbfs:', '/dbfs')
+        assert os.path.exists(read1), read1 + ' not found'
     fastq_to_csv(read1, temp_file1, pairs=pairs)
     input_data = spark.read.csv('file://'+ temp_file1, sep='\t', schema=FASTQ_SCHEMA)
     if read2:
         if read2[0:5] == 'dbfs:':
             read2 = read1.replace('dbfs:', '/dbfs')
+            assert os.path.exists(read2), read2 + ' not found'
         temp_file2 = temp_dir + ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(8))
+        fastq_to_csv(read2, temp_file2, pairs=False)
         input_data = ( input_data
             .union(spark.read.csv('file://' + temp_file2, sep='\t', schema=FASTQ_SCHEMA))
             .sort('name')
@@ -141,7 +144,31 @@ def fasta_to_seq(input_fasta_file, output_pq_file, overwrite=True):
         else:
             input_data.write.parquet(output_pq_file) 
 
+def reads_to_df(read1, read2=None, format='fq', max_reads=0, joinpair=False):
+    """
+    import reads with allowed formats: fa, fq, seq
+    pairs are indicted with a 'p': pfa, pfq
+    return reads dataframe
+    """
+    spark = SparkSession.getActiveSession()
 
+    if read2:
+        print('Inputs are paired fastq format: %s <-> %s' % (read1, read2))
+        read_df = fastq_to_seq(output_pq_file='', read1=read1, read2=read2, joinpair=joinpair)
+    else:
+        if format == 'fa':
+            print('%s is fasta format' % read1)
+            read_df = fasta_to_seq(read1, output_pq_file='')
+        elif format == 'fq':
+            print('%s is fastq or interleaved paired fq format' % read1)
+            read_df = fastq_to_seq(output_pq_file='', read1=read1, joinpair=joinpair)
+        elif format == 'seq':
+            print('%s is parquet/seq format' % read1)
+            read_df = spark.read.parquet(read1)
+    if max_reads >0:
+        return read_df.limit(max_reads)
+    else:
+        return read_df
 
 def clean_up_read(seq):
         """

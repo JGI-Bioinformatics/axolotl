@@ -9,13 +9,42 @@ from axolotl.io.samples import *
 input_seq = 's3://share.jgi-ga.org/gis20mock/illumina.seq'
 sample1 = Sample(sampleId=0, sampleName='test')
 sample1.import_sequences(read1=[input_seq], read2=[], format='seq', max_files=0, max_reads=0, remove_non_alphabet=False)
-sample1.save(datapath='s3://share.jgi-ga.org/gis20mock/illumina_', overwrite=False)    
+sample1.save(dataPath='s3://share.jgi-ga.org/gis20mock/illumina_meta.json', overwrite=False)    
 
 # load an existing sample
-sample1 = Sample(datapath='s3://share.jgi-ga.org/gis20mock/illumina_')
+sample2 = Sample()
+sample2 = Sample(dataPath='s3://share.jgi-ga.org/gis20mock/illumina_meta.json')
 
 # print out sample info
-sample1.info()
+sample2.info()
+
+"""
+
+from pyspark.sql import DataFrame, SparkSession
+import pyspark.sql.functions as F
+from pyspark.sql.types import *
+from functools import reduce
+from axolotl.io.reads import reads_to_df, clean_up_read_udf
+from axolotl.io.cloudFS import get_cloud_filelist
+
+"""
+# Genomics sample class
+# By zhong wang @lbl.gov
+
+spark = SparkSession.builder.getOrCreate()
+
+from axolotl.io.samples import *
+
+input_seq = 's3://share.jgi-ga.org/gis20mock/illumina.seq'
+sample1 = Sample(sampleId=0, sampleName='test')
+sample1.import_sequences(read1=[input_seq], read2=[], format='seq', max_files=0, max_reads=0, remove_non_alphabet=False)
+sample1.save(dataPath='s3://share.jgi-ga.org/gis20mock/illumina_meta.json', overwrite=False)    
+
+# load an existing sample
+sample2 = Sample()
+sample2 = Sample(dataPath='s3://share.jgi-ga.org/gis20mock/illumina_meta.json')
+# print out sample info
+sample2.info()
 
 """
 
@@ -26,51 +55,30 @@ from functools import reduce
 from axolotl.io.reads import fastq_to_seq, fasta_to_seq, clean_up_read_udf
 from axolotl.io.cloudFS import get_cloud_filelist
 
-def reads_to_df(read1, read2=None, format='fq', max_reads=0, joinpair=False):
-    """
-    import reads with allowed formats: fa, fq, seq
-    pairs are indicted with a 'p': pfa, pfq
-    return reads dataframe
-    """
-    spark = SparkSession.getActiveSession()
-
-    if read2:
-        print('Inputs are paired fastq format: %s <-> %s' % (read1, read2))
-        read_df = fastq_to_seq(output_pq_file='', read1=read1, read2=read2, joinpair=joinpair)
-        return read_df.limit(max_reads)
-
-    if format == 'fa':
-        print('%s is fasta format' % read1)
-        read_df = fasta_to_seq(read1, output_pq_file='')
-    elif format == 'fq':
-        print('%s is fastq or interleaved paired fq format' % read1)
-        read_df = fastq_to_seq(output_pq_file='', read1=read1, joinpair=joinpair)
-    elif format == 'seq':
-        print('%s is parquet/seq format' % read1)
-        if max_reads >0:
-            read_df = spark.read.parquet(read1)
-        else:
-            read_df = spark.read.parquet(read1)
-
-    return read_df.limit(max_reads)
+SAMPLE_SCHEMA = StructType([
+  StructField("sampleId", IntegerType()),
+  StructField("sampleName", StringType()),
+  StructField("read1", ArrayType(StringType())),
+  StructField("read2", ArrayType(StringType())),            
+  StructField("originalFormat",  StringType()),
+  StructField("joinPair", BooleanType()),
+  StructField("removeNonAlphabet", BooleanType()),  
+  StructField("readPath", StringType()),
+  StructField("kmerPath", StringType()), 
+  StructField("dataPath", StringType()),  
+  StructField("readCount", LongType()),
+  StructField("kmerCount", LongType())
+])
 
 class Sample:
-    def __init__(self,  *datapath, **kwargs):
+    def __init__(self, **kwargs):
         """
         sampleId is a unique integer
         sampleName is a unique name
         filePath is the path of the sequence file, or a directory containing the sequencing files
         """
-        spark = SparkSession.getActiveSession()
-        metadata = spark.read.json(datapath + 'meta.json').collect().asDict()
-        for key in metadata:
-            setattr(self, key, metadata[key])
-        if self.readPath:
-            self.reads = spark.read.parquet(self.readPath)
-        if self.kmerPath:
-            self.kmers = spark.read.parquet(self.kmerPath) 
         for key in kwargs: # if not new object, will overwrite the loaded values
-            setattr(self, key, kwargs[key])
+            self.__dict__.update(kwargs)
 
     def update_or_add(self, attr, value):
         # update an existing attribute or add a new one
@@ -79,17 +87,35 @@ class Sample:
         else:
             setattr(self, attr, value)
 
+    def load(self, dataPath=''):
+        # load a saved sample
+        spark = SparkSession.getActiveSession()
+        try:
+            metadata = spark.read.json(dataPath, schema=SAMPLE_SCHEMA).collect()[0].asDict()
+            for key in metadata:
+                setattr(self, key, metadata[key])
+        except:
+            print('Unable to load the saved sample at ' + dataPath + '. Please make sure the data exists.')
+            self = {
+                'readPath': '',
+                'kmerPath': ''
+            }
+        if ('readPath' in self.__dict__.keys()) and self.readPath:
+            self.reads = spark.read.parquet(self.readPath)
+        if ('kmerPath' in self.__dict__.keys()) and self.kmerPath:
+            self.kmers = spark.read.parquet(self.kmerPath) 
+               
     def info(self):
         # print out sample info
-        print("Sample ID:%d" % self.id) 
-        print("Sample Name:%s" % self.name)
+        print("Sample ID:%d" % self.sampleId) 
+        print("Sample Name:%s" % self.sampleName)
         print("Sample dataPath:%s" % self.dataPath)
-        if self.reads:
+        if ('reads' in self.__dict__.keys()) and self.reads:
             print("Sample readCount:%d" % self.readCount)
         else:
             print("Sample doesn't contain any reads.")
 
-        if self.kmers:
+        if ('kmers' in self.__dict__.keys()) and self.kmers:
             print("Sample has kmer calcuated.")  
 
     def import_sequences(self, read1, read2=[], format='fq', joinpair=False, max_files=0, max_reads=0, remove_non_alphabet=False):
@@ -134,7 +160,7 @@ class Sample:
                 )
             else:
                 reads = reads.selectExpr("id as id", "name as name", "upper as seq")
-            reads = reads.withColumn('sid', F.lit(self.id))
+            reads = reads.withColumn('sid', F.lit(self.sampleId))
                 
             counts = reads.count() 
             total_read_count += counts
@@ -150,30 +176,31 @@ class Sample:
             self.reads = all_reads[0]           
         self.readCount = total_read_count
 
-    def save(self, datapath=None, key='reads', overwrite=True):
+    def save(self, dataPath=None, key='reads', overwrite=True):
         # save a sample
         spark = SparkSession.getActiveSession()
-        if datapath: # default to sample's datapath
-            self.dataPath = datapath
+        if dataPath: # default to sample's datapath
+            self.dataPath = dataPath
         else:
-            datapath = self.dataPath
-        metadata = vars(self)
-        metadata.pop('reads', None)
-        metadata.pop('kmers', None)
-        if self.reads and (key == 'reads'): #save the read data
-            readPath = datapath + 'reads.pq'
+            dataPath = self.dataPath
+
+        metadata = vars(self)        
+
+        if ('reads' in self.__dict__.keys()) and (self.reads is not None) and (key == 'reads'): #save the read data
+            readPath = dataPath + 'reads.pq'
             if overwrite:
                 self.reads.write.mode("overwrite").parquet(readPath)
             else:
                 self.reads.write.parquet(readPath)
             metadata['readPath'] = readPath
-        if self.kmers and (key == 'kmers'): #save the read data
-            kmerPath = datapath + 'kmers.pq'
+        if ('kmers' in self.__dict__.keys()) and (self.kmers is not None) and (key == 'kmers'): #save the read data
+            kmerPath = dataPath + 'kmers.pq'
             if overwrite:
                 self.kmers.write.mode("overwrite").parquet(kmerPath)
             else:
                 self.kmers.write.parquet(kmerPath)
             metadata['kmerPath'] = kmerPath
-        # save metafile
-        meta_path = datapath + 'meta.json'
-        spark.sparkContext.parallelize(metadata).toDF().write.mode("overwrite").json(meta_path)
+        # save metafile without the dataframes
+        metadata.pop('reads', None)
+        metadata.pop('kmers', None)
+        spark.createDataFrame([metadata], schema=SAMPLE_SCHEMA).coalesce(1).write.mode("overwrite").json(dataPath)
