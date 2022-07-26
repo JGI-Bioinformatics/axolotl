@@ -165,7 +165,7 @@ def fastq_to_df(input_fq):
         .zipWithIndex()
         .map(lambda x: (x[0], int(x[1]/4), x[1]%4))
         .groupBy(lambda x: x[1])
-        .map(lambda x: list(x[1]))
+        .map(lambda x: sorted(list(x[1]), key=lambda y:y[2], reverse=False))
         .map(lambda x: (x[0][1], x[0][0], x[1][0], x[2][0], x[3][0]))
     ).toDF(['id', 'name', 'seq', 'plus', 'qual'])
     return fastqDF
