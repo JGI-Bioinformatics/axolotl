@@ -13,6 +13,7 @@ Add support for SAM/BAM formats
 
 """
 from pyspark.sql import SparkSession
+from pyspark.context import SparkContext
 import pyspark.sql.functions as F
 from pyspark.sql.types import *
 import os,subprocess
@@ -56,7 +57,7 @@ def fastq_to_csv(input_fastq_file, csv_file, pairs=True, overwrite=False):
           subprocess.call(paste, stdin=ps.stdout, stdout=f) 
           ps.wait()
 
-def fastq_to_seq(output_pq_file, read1, read2=None, pairs=True, joinpair=False, overwrite=True, temp_dir='/local_disk0/tmp/'):
+def fastq_to_seq(output_pq_file, read1, read2=None, pairs=True, joinpair=False, overwrite=True):
     """Convert fastq file to seq format (parquet) via a csv intermediate file
 
     :param output_pq_file: seq format output (id, name, seq, qual), required. If empty string, return the dataframe 
@@ -77,30 +78,14 @@ def fastq_to_seq(output_pq_file, read1, read2=None, pairs=True, joinpair=False, 
     :rtype: None
     :return:  None
     """
-    import random
-    import string
     spark = SparkSession.getActiveSession()
-    temp_file1 = temp_dir + ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(8))
-    if read1[0:5] == 'dbfs:':
-        read1 = read1.replace('dbfs:', '/dbfs')
-        assert os.path.exists(read1), read1 + ' not found'
-    fastq_to_csv(read1, temp_file1, pairs=pairs)
-    input_data = spark.read.csv('file://'+ temp_file1, sep='\t', schema=FASTQ_SCHEMA)
+    input_data = fastq_to_df(read1)
     if read2:
-        if read2[0:5] == 'dbfs:':
-            read2 = read1.replace('dbfs:', '/dbfs')
-            assert os.path.exists(read2), read2 + ' not found'
-        temp_file2 = temp_dir + ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(8))
-        fastq_to_csv(read2, temp_file2, pairs=False)
-        input_data = ( input_data
-            .union(spark.read.csv('file://' + temp_file2, sep='\t', schema=FASTQ_SCHEMA))
+        input_data = (input_data 
+            .union(fastq_to_df(read2))
             .sort('name')
+            .withColumn("id", F.monotonically_increasing_id()) # replace ids with new ones to avoid conflict
         )
-        
-    input_data = (input_data
-        .withColumn("id", F.monotonically_increasing_id())
-        .select('id', 'name', 'seq', 'qual')
-    )
  
     if joinpair:
         # assuming the two reads end with /1 and /2
@@ -169,6 +154,21 @@ def reads_to_df(read1, read2=None, format='fq', max_reads=0, joinpair=False):
         return read_df.limit(max_reads)
     else:
         return read_df
+
+def fastq_to_df(input_fq):
+    """
+    take a fastq file, return a readDF with read index
+    """
+    sc = SparkContext.getOrCreate()
+    fastqDF = (sc
+        .textFile(input_fq)
+        .zipWithIndex()
+        .map(lambda x: (x[0], int(x[1]/4), x[1]%4))
+        .groupBy(lambda x: x[1])
+        .map(lambda x: list(x[1]))
+        .map(lambda x: (x[0][1], x[0][0], x[1][0], x[2][0], x[3][0]))
+    ).toDF(['id', 'name', 'seq', 'plus', 'qual'])
+    return fastqDF
 
 def clean_up_read(seq):
         """
