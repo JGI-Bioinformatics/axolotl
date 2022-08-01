@@ -20,14 +20,11 @@ def reads_stats(reads, fraction=1.0, seed=1234, withReplacement=False, show=True
     for col in ['id', 'seq', 'qual']:
         assert (col in reads.columns), col+" column not in reads!" 
 
-    mq_cmd = """SELECT id, name, qual, seq, gc_percent, meanQuality(qual) as mean_qual from reads"""
-    gc_cmd = """SELECT id, name, qual, seq, getGC(seq) as gc_percent from reads"""
+    sql_cmd = """SELECT id, name, qual, seq, getGC(seq) as gc_percent, meanQuality(qual) as mean_qual from reads"""
     if fraction < 1.0:
         reads = reads.sample(withReplacement,fraction,seed)
     reads.createOrReplaceTempView('reads')   
-    reads = spark.sql(gc_cmd)
-    reads.createOrReplaceTempView('reads')
-    reads = spark.sql(mq_cmd)    
+    reads = spark.sql(sql_cmd)  
     reads = (reads
                 .withColumn('length',F.length('seq'))
                 .withColumn('N_count',F.col('length')-F.length(F.regexp_replace(F.col('seq'),'N','')))
