@@ -35,7 +35,9 @@ def reads_stats(reads, fraction=1.0, seed=1234, withReplacement=False, show=True
     if show:
       # print length statistics
       print("Reads quality statistics:")
-      reads.select('length', 'N_count', 'mean_qual', 'gc_percent', ).summary().show()
+      reads.select('length', 'N_count', 'mean_qual', 'gc_percent').summary().show()
+      reads.select('length', 'N_count', 'mean_qual', 'gc_percent').to_pandas_on_spark().to_pandas().hist(bins=20);
+      return
     return reads
 
 def reads_filter(reads, maxNs=2, minQual=30):
