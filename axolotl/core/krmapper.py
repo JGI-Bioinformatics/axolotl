@@ -162,6 +162,22 @@ def reads_to_kmersu(reads_df, k=31, m=15, n=0):
     query = 'SELECT id, sid, seq, jkmerudf(seq, {}, {}) as kmerlist from reads'.format(m,w)
     return spark.sql(query)
 
+def reads_to_kmersu2(reads_df, k=31, m=15, n=0):
+    """
+    kmer function for paired sequences
+    given a reads dataframe with columns ['id', 'sid', 'seq', 'pname' ...]
+    calculate kmer to ids mapping
+    use java UDF
+    w = k-m
+    """
+    spark = SparkSession.getActiveSession()
+    # kmer dataframe: kmer(Integer), kmer_count(Integer). Ids(Array(Integer))
+    reads_df.createOrReplaceTempView("reads")
+    w = k - m
+    if w <= 0:
+        w = 1 # kmers
+    query = 'SELECT id, sid, seq, pname, jkmerudf(seq, {}, {}) as kmerlist from reads'.format(m,w)
+    return spark.sql(query)
 
 def kmer_filter(reads_df, min_kmer_count=2):
     """

@@ -53,7 +53,7 @@ def quality_filter(reads, maxNs=2, minQual=30):
     print("Reads %d were retained out of %d total reads." % (filtered.count(), reads.count()))
     return filtered
     
-def contamination_detection(reads, reference, k=31, minimizer=False, min_kmer_count=0, save_file=False, show=False):
+def contamination_filter(reads, reference, k=31, minimizer=False, min_kmer_count=0, save_file=False, show=False):
   """
   :param reads: input data
   :type reads: DataFrame
