@@ -48,3 +48,4 @@ def reads_filter(reads, maxNs=2, minQual=30):
         reads = reads_stats(reads, fraction=1.0, show=False)
     filtered = reads.where((F.col('N_count')<=maxNs) & (F.col('mean_qual')>=minQual))
     print("Reads %d were retained out of %d total reads." % (filtered.count(), reads.count()))
+    return filtered
