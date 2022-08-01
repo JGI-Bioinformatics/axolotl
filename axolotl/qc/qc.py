@@ -51,9 +51,6 @@ def quality_filter(reads, maxNs=2, minQual=30):
         reads = reads_stats(reads, fraction=1.0, show=False)
     filtered = reads.where((F.col('N_count')<=maxNs) & (F.col('mean_qual')>=minQual))
     print("Reads %d were retained out of %d total reads." % (filtered.count(), reads.count()))
-<<<<<<< Updated upstream
-    return filtered
-=======
     return filtered
     
 def contamination_detection(reads, reference, k=31, minimizer=False, min_kmer_count=0, save_file=False, show=False):
@@ -104,4 +101,3 @@ def contamination_detection(reads, reference, k=31, minimizer=False, min_kmer_co
     return temp_file1
   else:
     return clean
->>>>>>> Stashed changes
