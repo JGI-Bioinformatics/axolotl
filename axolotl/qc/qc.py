@@ -53,51 +53,49 @@ def quality_filter(reads, maxNs=2, minQual=30):
     print("Reads %d were retained out of %d total reads." % (filtered.count(), reads.count()))
     return filtered
     
-def contamination_filter(reads, reference, k=31, minimizer=False, min_kmer_count=0, save_file=False, show=False):
-  """
-  :param reads: input data
-  :type reads: DataFrame
-  :param reference: known contaminant
-  :type reference: DataFrame
-  :param k: kmer length
-  :type  k: int
-  :param minimizer: whether to use minimizer
-  :type minimizer: bool
-  :param min_kmer_count: remove kmers with low occurance
-  :type min_kmer_count: int
-  :param save_file: If True, save clean sequences to fastq file, else return a DataFrame
-  :type save_file: bool
-  :param show: If True, print the filteration stats. 
-  :type show: bool
-  """
-  m = int(k/2) + 1 if minimizer else k
-  n = 0
-  
-  # kmers in the reference file
-  kmers_ref = reads_to_kmersu(reference, k=k, m=m, n=n).select('id', 'sid', 'kmerlist')
-  
-  # filter the Kmers in the reference file using the min_kmer parameter
-  # remove duplicated kmers
-  filtered_kmers_ref = kmer_filter(kmers_ref, min_kmer_count)
-  
-  # Kmers in the sample file
-  kmers_input = (reads_to_kmersu2(reads, k=k, m=m, n=n)
-                .select('id', 'sid', 'pname', F.explode("kmerlist").alias('kmer')))
-  
-  contaminated_kmers=(kmers_input.join(filtered_kmers_ref,
-                                  kmers_input['kmer'] ==filtered_kmers_ref['kmer'],'inner')
-                                 .select(F.col('pname').alias('cpname')))
-  
-  clean=(reads.join(contaminated_kmers
-                    ,reads['pname'] == contaminated_kmers['cpname'],'left_anti')
-                    .select('id','sid','name','pname','seq','qual'))
-  if show:
-     print("Reads %d were retained out of %d total reads." % (clean.count(), reads.count()))
-  if save_file:
-    temp_dir='/local_disk0/tmp/'
-    temp_file1 = temp_dir + ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(8))
-    save_parquet(clean,temp_file1)
-    # return file path
-    return temp_file1
-  else:
-    return clean
+def contamination_filter(outfile, reads, reference, k=31, minimizer=False, min_kmer_count=0, singleton=True):
+    """
+    :param outfile: output file
+    :type outfile: string
+    :param reads: input data
+    :type reads: DataFrame
+    :param reference: known contaminant
+    :type reference: DataFrame
+    :param k: kmer length
+    :type  k: int
+    :param minimizer: whether to use minimizer
+    :type minimizer: bool
+    :param min_kmer_count: remove kmers with low occurance
+    :type min_kmer_count: int
+    :return cleaned reads
+    :return type: dataframe or none
+    """
+    m = int(k/2) + 1 if minimizer else k
+    n = 0
+
+    # kmers in the reference file
+    kmers_ref = reads_to_kmersu(reference, k=k, m=m, n=n).select('id', 'sid', 'kmerlist')
+    kmers_ref = kmer_filter(kmers_ref, 0).select('kmer', F.explode('Ids').alias('id'))
+    # Kmers in the sample file
+    kmers_input = reads_to_kmersu(reads, k=k, m=m, n=n).select('id', 'sid', 'kmerlist')
+    kmers_input = kmer_filter(kmers_input, min_kmer_count).select('kmer', F.explode('Ids').alias('rid'))
+
+    contaminated_kmers = (kmers_input
+                            .join(kmers_ref, on='kmer', how='inner')
+                            .select('rid')
+    )
+
+    clean = (reads
+                .join(contaminated_kmers,reads['id'] == contaminated_kmers['rid'],'left_anti')
+                .drop('rid')
+    )
+
+    if not singleton:
+        # drop singletons
+        donothing=1
+    print("Reads %d were retained out of %d total reads." % (clean.count(), reads.count()))
+    if outfile == '':
+        return clean
+    else:
+        save_parquet(clean,outfile)
+
