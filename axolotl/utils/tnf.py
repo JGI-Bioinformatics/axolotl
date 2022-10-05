@@ -11,36 +11,10 @@ Not efficient, use a JAVA version
 
 """
 
-import pyspark.sql.functions as F
-from pyspark.sql.types import *
-from collections import Counter, deque
 from itertools import product
 import pandas as pd
-import numpy as np
 
-
-def generate_kmers(seq, seqrc, k=31):
-    # generate mkers given a sequence and its reverse complement
-    # use a queue type of implementation to speed up
-    kmers = []
-
-    # initialize the queues
-    queue = deque(seq[0:k]) 
-    rcqueue = deque(seqrc[0:k]) 
-    kmers.append(min([queue, rcqueue]))
-    for i in range(1, len(seq)-k+1):
-        queue.popleft()
-        queue.append(seq[i:i+1])
-        rcqueue.popleft()
-        rcqueue.append(seqrc[i:i+1])        
-        kmers.append(min([queue, rcqueue]))
-    kmers = [k for k in kmers if 'N' not in k] # a kmer containing 'N' is filtered out
-    return kmers
-
-complement = {'A':'T', 'C':'G', 'G':'C', 'T':'A'}
-def reverse_complement(seq):
-  return "".join(complement.get(base, base) for base in reversed(seq))
-
+reverse_complement =  ''.maketrans({'A':'T', 'T':'A', 'G':'C', 'C':'G'})
 def tnf_dict():
     # return tnf dictionary, key is 4-mer, value is vector index
     alphabets = [['A', 'C', 'G', 'T'], ['A', 'C', 'G', 'T'], ['A', 'C', 'G', 'T'], ['A', 'C', 'G', 'T']]
@@ -50,29 +24,22 @@ def tnf_dict():
     tetra = {}
     counter = 0
     for r in result:
-        rc = reverse_complement(r)
+        rc = r.translate(reverse_complement)[::-1]
         if r <= rc:
             tetra[r] = counter
-            tetra[rc] = counter
-            counter +=1
+            counter +=1           
     return tetra
 
 tetra = tnf_dict()
-
-def tnf(sequence, tetra=tetra):
-    # calculate TNF vector
-    rc = reverse_complement(sequence)
-    tnf = [0.0] * 136
-    for i in range(len(sequence)-3):
-        mer = sequence[i:i+4]
-        rmer = rc[i:i+4]
-        if mer > rmer:
-          mer = rmer
-        if mer in tetra:
-          tnf[tetra[mer]]+=1
-    length =  len(sequence)-3.0
-    tnf = [i/length for i in tnf]
-    return tnf
+def tnf(seq, tetra=tetra):
+    # use last element for non-alphabets
+    tnf_vector = [0]*137
+    seq = seq.upper()
+    # initialize the queues
+    num_kmers = len(seq)-3
+    for i in range(0, num_kmers):
+      tnf_vector[tetra.get(min(seq[i:i+4], seq[i:i+4].translate(reverse_complement)[::-1]), 136)] +=1
+    return [t/num_kmers for t in tnf_vector[0:136]]
 
 def reads_tnf(reads, method='median', sample=0):
   """
@@ -88,3 +55,6 @@ def reads_tnf(reads, method='median', sample=0):
     return list(reads_tnf.median(axis=0)) # convert numpy object to list for spark to handle
   else:
     return list(reads_tnf.mean(axis=0)) # convert numpy object to list for spark to handle
+
+
+

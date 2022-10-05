@@ -92,7 +92,15 @@ def contamination_filter(outfile, reads, reference, k=31, minimizer=False, min_k
 
     if not singleton:
         # drop singletons
-        donothing=1
+        # assuming the two reads end with /1 and /2
+        # still works if the names of the pair are the same
+        doublets = (clean
+            .withColumn('pname', F.split('name', '/').getItem(0))
+            .groupby('pname')
+            .agg(F.count('pname'))
+            .where(F.col('pname')>1)
+        )
+        clean = clean.join(doublets, clean['name'] == doublets['pname'], 'inner')
     print("Reads %d were retained out of %d total reads." % (clean.count(), reads.count()))
     if outfile == '':
         return clean
