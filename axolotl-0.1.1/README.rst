@@ -13,6 +13,17 @@ A Python Genomics Library based on pySpark
 Features
 --------
 
+Install
+--------
+  1. Install Java UDFs
+  ```
+  cd sparcudfs
+  mvn clean package
+  ```
+  If successful, you will see a jar file: ./target/sparcudfs-X.X.jar
+  2. Package the tar.gz for pip
+
+
 * TODO
 
 Credits

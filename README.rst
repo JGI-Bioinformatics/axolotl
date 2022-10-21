@@ -13,6 +13,25 @@ A Python Genomics Library based on pySpark
 Features
 --------
 
+Install
+--------
+  1. Install Java UDFs
+  ```
+  cd sparcudfs
+  mvn clean package
+  cd ..
+  ```
+  If successful, you will see a jar file: ./target/sparcudfs-X.X.jar
+  2. Package the tar.gz for pip
+  ```
+  python setup.py sdist
+  ```
+  3. On the target machine
+  ```
+  pip install dist/axolotl-0.1.1.tar.gz
+  ```
+
+
 * TODO
 
 Credits
