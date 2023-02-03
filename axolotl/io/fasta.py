@@ -17,9 +17,8 @@ class FastaIO(AxolotlIO):
         return "\n>"
     
     @classmethod
-    def _parseRecord(cls, text:str) -> Dict:
-        # TODO: parse quality other than Phred+33
-        if text[0] == "@":
+    def _parseRecord(cls, text:str, params:Dict={}) -> Dict:
+        if text[0] == ">":
             text = text[1:]
         rows = text.rstrip("\n").split("\n")
         try:

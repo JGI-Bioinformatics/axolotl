@@ -129,7 +129,7 @@ class AxolotlIO(ABC):
     """Axolotl basic Input/Output (mostly input) class"""
     
     @classmethod
-    def loadSmallFiles(cls, file_pattern:str) -> ioDF:
+    def loadSmallFiles(cls, file_pattern:str, params:Dict={}) -> ioDF:
         spark = SparkSession.getActiveSession()
         if spark == None:
             raise Exception("can't find any Spark active session!")
@@ -142,12 +142,12 @@ class AxolotlIO(ABC):
         return cls._getOutputDFclass()(
             sc.wholeTextFiles(file_pattern)\
             .reduceByKey(lambda row1, row2: row1)\
-            .flatMap(cls._parseFile)\
+            .flatMap(lambda x: cls._parseFile(x[0], x[1], params))\
             .toDF(schema=cls._getOutputDFclass().getSchema())
         )        
 
     @classmethod
-    def loadConcatenatedFiles(cls, file_pattern:str, persist:bool=True, intermediate_pq_path:str="") -> ioDF:
+    def loadConcatenatedFiles(cls, file_pattern:str, persist:bool=True, intermediate_pq_path:str="", params:Dict={}) -> ioDF:
         spark = SparkSession.getActiveSession()
         if spark == None:
             raise Exception("can't find any Spark active session!")
@@ -177,8 +177,8 @@ class AxolotlIO(ABC):
         .map(lambda x: x[:-1])\
         .filter(lambda x: x != "")\
         .map(lambda x: tuple(x.split(cls._getFileDelimiter()[1], 1)))\
-        .reduceByKey(lambda row1, row2: row1)\
-        .flatMap(cls._parseFile)\
+        .reduceByKey(lambda row1, row2: (row1[0], row1[1], params))\
+        .flatMap(lambda x: cls._parseFile(x[0], x[1], params))\
         .toDF(schema=cls._getOutputDFclass().getSchema())
         
         if persist:
@@ -200,7 +200,7 @@ class AxolotlIO(ABC):
         return cls._getOutputDFclass()(df)
         
     @classmethod
-    def loadBigFiles(cls, file_paths:List[str], intermediate_pq_path:str) -> ioDF:
+    def loadBigFiles(cls, file_paths:List[str], intermediate_pq_path:str, params:Dict={}) -> ioDF:
         spark = SparkSession.getActiveSession()
         if spark == None:
             raise Exception("can't find any Spark active session!")
@@ -254,7 +254,7 @@ class AxolotlIO(ABC):
                     ).format(file_path))
                 # parse
                 spark.createDataFrame(
-                    sc.textFile(file_path).filter(lambda x: x != "").map(cls._parseRecord),
+                    sc.textFile(file_path).filter(lambda x: x != "").map(lambda y: cls._parseRecord(y, params)),
                     schema=cls._getOutputDFclass()._getSchemaSpecific()
                 )\
                 .withColumn("record_id", monotonically_increasing_id())\
@@ -309,23 +309,22 @@ class AxolotlIO(ABC):
     
     @classmethod
     @abstractmethod
-    def _parseRecord(cls, text:str) -> List[Dict]:
+    def _parseRecord(cls, text:str, params:Dict={}) -> Dict:
         raise NotImplementedError("calling an unimplemented abstract method _parseRecord()")
 
     @classmethod
-    def _parseFile(cls, tup:Tuple[str, str]) -> List[Row]:
-        file_path, text = tup
+    def _parseFile(cls, file_path:str, text:str, params:Dict={}) -> List[Row]:
         result = []
         for i, record_text in enumerate(
             text.split(cls._getRecordDelimiter())
         ):
             if record_text == "":
                 continue
-            parsed = cls._parseRecord(record_text)
+            parsed = cls._parseRecord(record_text, params)
             if parsed == None:
                 continue
             result.append({
-                **cls._parseRecord(record_text),
+                **cls._parseRecord(record_text, params),
                 **{
                     "record_id": i,
                     "file_path": file_path

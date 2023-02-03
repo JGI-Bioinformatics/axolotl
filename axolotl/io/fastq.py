@@ -29,7 +29,7 @@ class FastqIO(AxolotlIO):
         return ReadSequenceDF
     
     @classmethod
-    def _parseRecord(cls, text:str) -> Dict:
+    def _parseRecord(cls, text:str, params:Dict={}) -> Dict:
         # TODO: parse quality other than Phred+33
         if text[0] == "@":
             text = text[1:]

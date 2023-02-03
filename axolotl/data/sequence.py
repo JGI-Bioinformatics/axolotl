@@ -72,7 +72,7 @@ class ProtSequenceDF(SequenceDF):
         return True
 
 
-class ReadSequenceDF(NucSequenceDF):
+class ReadSequenceDF(NuclSequenceDF):
     
     @classmethod
     def _getSchemaSpecific(cls) -> types.StructType:
