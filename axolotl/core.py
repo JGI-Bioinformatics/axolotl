@@ -7,7 +7,7 @@ from pyspark.sql import DataFrame, Row, types
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import lit, monotonically_increasing_id
 
-from axolotl.utils import check_file_exists, is_directory
+from axolotl.utils.file import check_file_exists, is_directory
 
 from abc import ABC, abstractmethod
 from os import path

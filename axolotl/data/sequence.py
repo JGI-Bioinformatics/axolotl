@@ -1,4 +1,4 @@
-"""axolotl.bio.data.sequence
+"""axolotl.data.sequence
 
 Contain classes definition for Sequence DataFrames.
 """
@@ -42,17 +42,43 @@ class SequenceDF(ioDF):
         )
 
 
-class ReadSequenceDF(SequenceDF):
+class NuclSequenceDF(SequenceDF):
+    
+    @classmethod
+    def _getSchemaSpecific(cls) -> types.StructType:
+        return SequenceDF._getSchemaSpecific()
+
+    @classmethod
+    def getAllowedLetters(cls) -> str:
+        return "ATGCNatgcn"
+    
+    @classmethod
+    def validateRowSpecific(cls, row: Row) -> bool:
+        return True
+
+
+class ProtSequenceDF(SequenceDF):
+    
+    @classmethod
+    def _getSchemaSpecific(cls) -> types.StructType:
+        return SequenceDF._getSchemaSpecific()
+
+    @classmethod
+    def getAllowedLetters(cls) -> str:
+        return "ABCDEFGHIJKLMNOPQRSTUVWYZX*-abcdefghijklmnopqrstuvwyzx"
+    
+    @classmethod
+    def validateRowSpecific(cls, row: Row) -> bool:
+        return True
+
+
+class ReadSequenceDF(NucSequenceDF):
     
     @classmethod
     def _getSchemaSpecific(cls) -> types.StructType:
         return SequenceDF._getSchemaSpecific()\
             .add(types.StructField("quality_scores", types.ArrayType(types.ByteType())))
 
-    @classmethod
-    def getAllowedLetters(cls) -> str:
-        return "ATGCNatgcn"
-    
     @classmethod
     def validateRowSpecific(cls, row: Row) -> bool:
         return (
@@ -89,21 +115,6 @@ class ProtSequenceDF(SequenceDF):
     @classmethod
     def getAllowedLetters(cls) -> str:
         return "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz*_"
-    
-    @classmethod
-    def validateRowSpecific(cls, row: Row) -> bool:
-        return True
-
-
-class ContigSequenceDF(SequenceDF):
-    
-    @classmethod
-    def _getSchemaSpecific(cls) -> types.StructType:
-        return SequenceDF._getSchemaSpecific()
-
-    @classmethod
-    def getAllowedLetters(cls) -> str:
-        return "ATGCNatgcn"
     
     @classmethod
     def validateRowSpecific(cls, row: Row) -> bool:

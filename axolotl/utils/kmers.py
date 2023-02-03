@@ -1,7 +1,7 @@
-# axolotl.bio utils
+# axolotl utils
 
 def calc_kmer(text:str, k:int, blacklist_chars:str="", as_dict:bool=False):
-	"""calculate k-mers for any given string"""
+    """calculate k-mers for any given string"""
     blacklist_chars = set(blacklist_chars)
     n = len(text)
     i = 0
@@ -16,6 +16,6 @@ def calc_kmer(text:str, k:int, blacklist_chars:str="", as_dict:bool=False):
             if len(set.intersection(blacklist_chars, set(mer))) < 1
         }
     if as_dict:
-    	return result
+        return result
     else:
-	    return [(key, val) for key, val in result.items()]
+        return [(key, val) for key, val in result.items()]

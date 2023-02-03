@@ -1,4 +1,4 @@
-"""axolotl.bio.io.fastq
+"""axolotl.io.fastq
 
 Contain classes definition for loading single and paired FASTQ data.
 
@@ -7,7 +7,7 @@ TODO:
 """
 
 from axolotl.core import AxolotlIO
-from axolotl.bio.data.sequence import ReadSequenceDF
+from axolotl.data.sequence import ReadSequenceDF
 from typing import Dict
 
 
@@ -37,7 +37,7 @@ class FastqIO(AxolotlIO):
         try:
             return {
                 "seq_id": rows[0].split(" ", 1)[0],
-                "desc": rows[0].split(" ", 1)[1] if " " in " " in rows[0] else "",
+                "desc": rows[0].split(" ", 1)[1] if " " in rows[0] else "",
                 "sequence": rows[1],
                 "length": len(rows[1]),
                 "quality_scores": [cls.QUAL_PHRED33[x] for x in rows[3]]
