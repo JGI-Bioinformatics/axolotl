@@ -8,7 +8,7 @@ TODO:
 
 from axolotl.core import AxolotlIO
 from axolotl.data.seq import ReadSeqDF
-from typing import Dict
+from typing import Dict, List
 
 
 class FastqIO(AxolotlIO):
@@ -19,6 +19,25 @@ class FastqIO(AxolotlIO):
             "!\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~"
         )
     }
+    QUAL_PHRED64 = {
+        c: q for q, c in enumerate(
+            "@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefgh"
+        )
+    }
+    QUAL_SOLEXA64 = {
+        c: q-5 for q, c in enumerate(
+            ";<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefgh"
+        )
+    }
+
+    @classmethod
+    def decodeQual(cls, seq:str, encoding:str) -> List[int]:
+        encoder_list = {
+            "phred+33": cls.QUAL_PHRED33,
+            "phred+64": cls.QUAL_PHRED64,
+            "solexa+64": cls.QUAL_SOLEXA64
+        }
+        return [encoder_list[encoding][x] for x in seq]
     
     @classmethod
     def _getRecordDelimiter(cls) -> str:
@@ -34,13 +53,14 @@ class FastqIO(AxolotlIO):
         if text[0] == "@":
             text = text[1:]
         rows = text.rstrip("\n").split("\n")
+        encoding = params.get("encoding", "phred+33") 
         try:
             return {
                 "seq_id": rows[0].split(" ", 1)[0],
                 "desc": rows[0].split(" ", 1)[1] if " " in rows[0] else "",
                 "sequence": rows[1],
                 "length": len(rows[1]),
-                "quality_scores": [cls.QUAL_PHRED33[x] for x in rows[3]]
+                "quality_scores": cls.decodeQual(rows[3], encoding)
             }
         except:
             print("WARNING: failed parsing a malformed record text '{}'".format(
