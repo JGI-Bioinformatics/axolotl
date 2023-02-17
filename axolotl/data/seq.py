@@ -1,6 +1,6 @@
-"""axolotl.data.sequence
+"""axolotl.data.seq
 
-Contain classes definition for Sequence DataFrames.
+Contain classes definition for sequence's DataFrames.
 """
 
 from pyspark.sql import DataFrame, Row, types
@@ -10,7 +10,7 @@ from abc import abstractmethod
 from axolotl.core import ioDF
 
 
-class SequenceDF(ioDF):
+class SeqDF(ioDF):
     """basic sequence dataframe (abstract class)"""
     
     @classmethod
@@ -42,11 +42,12 @@ class SequenceDF(ioDF):
         )
 
 
-class NuclSequenceDF(SequenceDF):
+class NuclSeqDF(SeqDF):
+    """basic sequence dataframe (abstract class)"""
     
     @classmethod
     def _getSchemaSpecific(cls) -> types.StructType:
-        return SequenceDF._getSchemaSpecific()
+        return SeqDF ._getSchemaSpecific()
 
     @classmethod
     def getAllowedLetters(cls) -> str:
@@ -57,11 +58,11 @@ class NuclSequenceDF(SequenceDF):
         return True
 
 
-class ProtSequenceDF(SequenceDF):
+class ProtSeqDF(SeqDF):
     
     @classmethod
     def _getSchemaSpecific(cls) -> types.StructType:
-        return SequenceDF._getSchemaSpecific()
+        return SeqDF._getSchemaSpecific()
 
     @classmethod
     def getAllowedLetters(cls) -> str:
@@ -72,11 +73,11 @@ class ProtSequenceDF(SequenceDF):
         return True
 
 
-class ReadSequenceDF(NuclSequenceDF):
+class ReadSeqDF(NuclSeqDF):
     
     @classmethod
     def _getSchemaSpecific(cls) -> types.StructType:
-        return SequenceDF._getSchemaSpecific()\
+        return SeqDF._getSchemaSpecific()\
             .add(types.StructField("quality_scores", types.ArrayType(types.ByteType())))
 
     @classmethod
@@ -86,11 +87,11 @@ class ReadSequenceDF(NuclSequenceDF):
         )
 
 
-class PairedReadSequenceDF(ReadSequenceDF):
+class PReadSeqDF(ReadSeqDF):
     
     @classmethod
     def _getSchemaSpecific(cls) -> types.StructType:
-        return ReadSequenceDF._getSchemaSpecific()\
+        return ReadSeqDF._getSchemaSpecific()\
             .add(types.StructField("sequence_2", types.StringType()))\
             .add(types.StructField("length_2", types.LongType()))\
             .add(types.StructField("quality_scores_2", types.ArrayType(types.ByteType())))
@@ -104,18 +105,3 @@ class PairedReadSequenceDF(ReadSequenceDF):
             len(row["sequence_2"]) == row["length_2"] and
             len(row["quality_scores_2"]) == row["length_2"]
         )
-
-
-class ProtSequenceDF(SequenceDF):
-    
-    @classmethod
-    def _getSchemaSpecific(cls) -> types.StructType:
-        return SequenceDF._getSchemaSpecific()
-
-    @classmethod
-    def getAllowedLetters(cls) -> str:
-        return "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz*_"
-    
-    @classmethod
-    def validateRowSpecific(cls, row: Row) -> bool:
-        return True

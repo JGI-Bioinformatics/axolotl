@@ -7,7 +7,7 @@ TODO:
 """
 
 from axolotl.core import AxolotlIO
-from axolotl.data.sequence import ReadSequenceDF
+from axolotl.data.seq import ReadSeqDF
 from typing import Dict
 
 
@@ -25,8 +25,8 @@ class FastqIO(AxolotlIO):
         return "\n@"
     
     @classmethod
-    def _getOutputDFclass(cls) -> ReadSequenceDF:
-        return ReadSequenceDF
+    def _getOutputDFclass(cls) -> ReadSeqDF:
+        return ReadSeqDF
     
     @classmethod
     def _parseRecord(cls, text:str, params:Dict={}) -> Dict:

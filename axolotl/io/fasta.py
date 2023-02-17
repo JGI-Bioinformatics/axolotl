@@ -6,7 +6,7 @@ TODO:
 """
 
 from axolotl.core import AxolotlIO
-from axolotl.data.sequence import NuclSequenceDF, ProtSequenceDF
+from axolotl.data.seq import NuclSeqDF, ProtSeqDF
 from typing import Dict
 
 
@@ -38,13 +38,13 @@ class FastaIO(AxolotlIO):
 class NuclFastaIO(FastaIO):
     
     @classmethod
-    def _getOutputDFclass(cls) -> NuclSequenceDF:
-        return NuclSequenceDF
+    def _getOutputDFclass(cls) -> NuclSeqDF:
+        return NuclSeqDF
     
 
 class ProtFastaIO(FastaIO):
     
     @classmethod
-    def _getOutputDFclass(cls) -> ProtSequenceDF:
-        return ProtSequenceDF
+    def _getOutputDFclass(cls) -> ProtSeqDF:
+        return ProtSeqDF
     
