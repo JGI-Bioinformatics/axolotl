@@ -44,7 +44,7 @@ class AxolotlDF(ABC):
             raise Exception("can't find any Spark active session!")        
 
         metadata_path = path.join(src_parquet, ".axolotl_metadata.json")
-        if not path.exists(metadata_path):
+        if not check_file_exists(metadata_path):
             raise FileNotFoundError("can't find axolotl_metadata.json!")
         else:
             with open(metadata_path) as infile:
@@ -63,7 +63,7 @@ class AxolotlDF(ABC):
             return cls(spark.read.schema(cls.getSchema()).parquet(src_parquet))
     
     def store(self, parquet_file_path:str, num_partitions:int=-1):
-        if path.exists(parquet_file_path):
+        if check_file_exists(parquet_file_path):
             raise Exception("path exists! {}".format(parquet_file_path))
         if num_partitions > 0:
             self.df.repartition(num_partitions).write.option("schema", self.__class__.getSchema()).parquet(parquet_file_path)
