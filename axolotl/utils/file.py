@@ -4,7 +4,7 @@ from os import path
 import re
 
 
-def check_file_exists(file_path):
+def parse_path_type(file_path):
     matches = re.match(
         "^((?P<type>[a-z]+):/{1,2}){0,1}(?P<path>[^#\\<\\>\\$\\+%!`&\\*'\\|\\{\\?\"=\\}:\\@]+)$",
         file_path
@@ -16,9 +16,15 @@ def check_file_exists(file_path):
         
     if matches["type"] == None:
         matches["type"] = "file"
+
+    return matches
+
+
+def check_file_exists(file_path):
+    matches = parse_path_type(file_path)
     
     if matches["type"] == "file":
-        return path.exists(matches["path"])
+        return path.exists(path.abspath(matches["path"]))
     elif matches["type"] == "dbfs":
         spark = SparkSession.getActiveSession()
         if spark == None:
@@ -38,20 +44,10 @@ def check_file_exists(file_path):
 
 
 def is_directory(file_path):
-    matches = re.match(
-        "^((?P<type>[a-z]+):/{1,2}){0,1}(?P<path>[^#\\<\\>\\$\\+%!`&\\*'\\|\\{\\?\"=\\}:\\@]+)$",
-        file_path
-    )
-    if matches == None:
-        raise FileNotFoundError("can't recognize filepath {}".format(file_path))
-    else:
-        matches = matches.groupdict()
-        
-    if matches["type"] == None:
-        matches["type"] = "file"
+    matches = parse_path_type(file_path)
     
     if matches["type"] == "file":
-        return path.isdir(matches["path"])
+        return path.isdir(path.abspath(matches["path"]))
     elif matches["type"] == "dbfs":
         spark = SparkSession.getActiveSession()
         if spark == None:
