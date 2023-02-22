@@ -116,7 +116,7 @@ class ioDF(AxolotlDF):
     @classmethod
     def getSchema(cls) -> types.StructType:
         return cls._getSchemaSpecific()\
-            .add(types.StructField("record_id", types.LongType()))\
+            .add(types.StructField("row_id", types.LongType()))\
             .add(types.StructField("file_path", types.StringType()))
     
     @classmethod
@@ -259,7 +259,7 @@ class AxolotlIO(ABC):
                     ).flatMap(lambda n: n).filter(lambda z: (z != None) if params.get("skip_malformed_record", False) else True),
                     schema=cls._getOutputDFclass()._getSchemaSpecific()
                 )\
-                .withColumn("record_id", monotonically_increasing_id())\
+                .withColumn("row_id", monotonically_increasing_id())\
                 .withColumn("file_path", lit(file_path))\
                 .write.mode('append').parquet(intermediate_pq_path)            
                 
@@ -329,10 +329,11 @@ class AxolotlIO(ABC):
                 result.append({ # the ** is to concatenate the two dictionaries
                     **parsed,
                     **{
-                        "record_id": i,
+                        "row_id": i,
                         "file_path": file_path
                     }
                 })
+                i += 1 # TODO: this implementation will NOT produce uniqe IDs across partitions!!
         return result
 
 
