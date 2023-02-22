@@ -7,7 +7,7 @@ from pyspark.sql import DataFrame, Row, types
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import lit, monotonically_increasing_id
 
-from axolotl.utils.file import check_file_exists, is_directory
+from axolotl.utils.file import check_file_exists, is_directory, make_dirs
 
 from abc import ABC, abstractmethod
 from os import path
@@ -333,4 +333,118 @@ class AxolotlIO(ABC):
                 }
             })
         return result
+
+
+class AxolotlRecord(ABC):
+    """base class for holding record-type objects, which serve as a 'dataset' of multiple linked AxolotlDFs"""
+
+    _data = {} # this holds all the AxolotlDF objects i.e., dataset tables; don't modify this directly
+    def data(self, key:str) -> AxolotlDF:
+        return self._data[key]
+
+    def getMetadata(self) -> Dict:
+        metadata = {
+            "class_name": self.__class__.__name__
+        }
+        return metadata
+
+    def __init__(self, imported_data):
+        for key, data_class in self.__class__._dataDesc().items():
+            if key not in imported_data:
+                raise Exception("need data -> '{}'".format(key))
+            elif data_class != imported_data[key].__class__:
+                raise Exception("data '{}' have format conflict".format(key))
+            self._data[key] = imported_data[key]
+
+    @classmethod
+    @abstractmethod
+    def _dataDesc(cls) -> Dict:
+        raise NotImplementedError("calling an unimplemented abstract method _dataDesc()")
+        
+    @classmethod
+    def load(cls, file_path:str, num_partitions:int=-1):
+        spark = SparkSession.getActiveSession()
+        if spark == None:
+            raise Exception("can't find any Spark active session!")        
+
+        metadata_path = path.join(file_path, "_metadata.json")
+        if not check_file_exists(metadata_path):
+            raise FileNotFoundError("can't find _metadata.json!")
+        else:
+            # todo: load metadata in a flexible way (at this point this won't work on databricks)
+            with open(metadata_path) as infile:
+                metadata = json.load(infile)
+            if metadata["class_name"] != cls.__name__:
+                raise TypeError("loaded class {} doesn't match the target class {}".format(
+                    metadata["class_name"],
+                    cls.__name__
+                ))
+                
+            data_folder = path.join(file_path, "data")
+            imported_data = {}
+            for key, data_class in cls._dataDesc().items():
+                df_path = path.join(data_folder, key)
+                if not check_file_exists(df_path):
+                    raise FileNotFoundError("can't data folder {}!".format(key))
+                imported_data[key] = data_class.load(df_path, num_partitions)
+                
+            return cls(imported_data)
     
+    def store(self, file_path:str, num_partitions:int=-1):
+        if check_file_exists(file_path):
+            raise Exception("path exists! {}".format(file_path))
+        
+        make_dirs(file_path)
+        data_folder = path.join(file_path, "data")
+        make_dirs(data_folder)
+        
+        for key, table in self._data.items():
+            table.store(path.join(data_folder, key), num_partitions)
+            
+        # todo: store metadata in a flexible way (at this point this won't work on databricks)
+        metadata_path = path.join(file_path, "_metadata.json")        
+        with open(metadata_path, "w") as outfile:
+            outfile.write(json.dumps(self.getMetadata()))
+
+
+class recordIO(AxolotlIO):
+    """base class for implementing AxolotlRecord-based files parsing, this wraps multiple different AxolotlIO into one"""
+    
+    @classmethod
+    def loadSmallFiles(cls, file_pattern:str, params:Dict={}) -> ioDF:
+        imported_data = {}
+        for key, data_class in cls._getOutputIOclasses().items():
+            imported_data[key] = data_class.loadSmallFiles(file_pattern, params)
+        return cls._getOutputDFclass()(imported_data)
+
+    @classmethod
+    def loadConcatenatedFiles(cls, file_pattern:str, persist:bool=True, intermediate_pq_path:str="", params:Dict={}) -> ioDF:
+        imported_data = {}
+        for key, data_class in cls._getOutputIOclasses().items():
+            imported_data[key] = data_class.loadConcatenatedFiles(file_pattern, persist, intermediate_pq_path + "." + key, params)
+        return cls._getOutputDFclass()(imported_data)
+        
+    @classmethod
+    def loadBigFiles(cls, file_paths:List[str], intermediate_pq_path:str, params:Dict={}) -> ioDF:
+        imported_data = {}
+        for key, data_class in cls._getOutputIOclasses().items():
+            imported_data[key] = data_class.loadBigFiles(file_paths, intermediate_pq_path + "." + key, params)
+        return cls._getOutputDFclass()(imported_data)
+
+    @classmethod
+    @abstractmethod
+    def _getOutputIOclasses(cls) -> Dict:
+        raise NotImplementedError("calling an unimplemented abstract method _getOutputIOclass()")
+        
+    @classmethod
+    @abstractmethod
+    def _getOutputDFclass(cls) -> AxolotlRecord:
+        raise NotImplementedError("calling an unimplemented abstract method _getOutputDFclass()")
+    
+    @classmethod
+    def _parseRecord(cls, text:str, params:Dict={}) -> Dict:
+        raise NotImplementedError("can't call _parseRecord() directly from a recordIO object")
+
+    @classmethod
+    def _parseFile(cls, file_path:str, text:str, params:Dict={}) -> List[Row]:
+        raise NotImplementedError("can't call _parseFile() directly from a recordIO object")
