@@ -55,15 +55,15 @@ class FastqIO(AxolotlIO):
         rows = text.rstrip("\n").split("\n")
         encoding = params.get("encoding", "phred+33") 
         try:
-            return {
+            return [{
                 "seq_id": rows[0].split(" ", 1)[0],
                 "desc": rows[0].split(" ", 1)[1] if " " in rows[0] else "",
                 "sequence": rows[1],
                 "length": len(rows[1]),
                 "quality_scores": cls.decodeQual(rows[3], encoding)
-            }
+            }]
         except:
             print("WARNING: failed parsing a malformed record text '{}'".format(
                 text if len(text) < 50 else text[:50] + "..."
             ))
-            return None
+            return [None]

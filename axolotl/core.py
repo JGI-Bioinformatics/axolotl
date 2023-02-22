@@ -256,7 +256,7 @@ class AxolotlIO(ABC):
                 spark.createDataFrame(
                     sc.textFile(file_path).filter(lambda x: x != "").map(
                         lambda y: cls._parseRecord(y, params)
-                    ).filter(lambda z: (z != None) if params.get("skip_malformed_record", False) else True),
+                    ).flatMap(lambda n: n).filter(lambda z: (z != None) if params.get("skip_malformed_record", False) else True),
                     schema=cls._getOutputDFclass()._getSchemaSpecific()
                 )\
                 .withColumn("record_id", monotonically_increasing_id())\
@@ -322,16 +322,17 @@ class AxolotlIO(ABC):
         ):
             if record_text == "":
                 continue
-            parsed = cls._parseRecord(record_text, params)
-            if parsed == None and params.get("skip_malformed_record", False):
-                continue
-            result.append({ # the ** is to concatenate the two dictionaries
-                **parsed,
-                **{
-                    "record_id": i,
-                    "file_path": file_path
-                }
-            })
+            parsed_array = cls._parseRecord(record_text, params)
+            for parsed in parsed_array:
+                if parsed == None and params.get("skip_malformed_record", False):
+                    continue
+                result.append({ # the ** is to concatenate the two dictionaries
+                    **parsed,
+                    **{
+                        "record_id": i,
+                        "file_path": file_path
+                    }
+                })
         return result
 
 
