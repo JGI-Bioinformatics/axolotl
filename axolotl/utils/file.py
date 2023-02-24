@@ -106,3 +106,14 @@ def make_dirs(file_path):
         raise NotImplementedError()
     else:
         raise NotImplementedError()
+
+
+def fopen(file_path, mode="r"):
+    matches = parse_path_type(file_path)
+    
+    if matches["type"] == "file":
+        return open(matches["path"], mode)
+    elif matches["type"] == "dbfs":
+        return open(path.join("/dbfs", matches["path"]), mode)
+    else:
+        raise NotImplementedError()

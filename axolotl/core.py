@@ -7,7 +7,7 @@ from pyspark.sql import DataFrame, Row, types
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import lit, monotonically_increasing_id
 
-from axolotl.utils.file import check_file_exists, is_directory, make_dirs
+from axolotl.utils.file import check_file_exists, is_directory, make_dirs, fopen
 
 from abc import ABC, abstractmethod
 from os import path
@@ -47,7 +47,7 @@ class AxolotlDF(ABC):
         if not check_file_exists(metadata_path):
             raise FileNotFoundError("can't find axolotl_metadata.json!")
         else:
-            with open(metadata_path) as infile:
+            with fopen(metadata_path) as infile:
                 metadata = json.load(infile)
             if metadata["class_name"] != cls.__name__:
                 raise TypeError("trying to load {} parquet file into a {}".format(
@@ -70,7 +70,7 @@ class AxolotlDF(ABC):
         else:
             self.df.write.option("schema", self.__class__.getSchema()).parquet(parquet_file_path)
         metadata_path = path.join(parquet_file_path, ".axolotl_metadata.json")        
-        with open(metadata_path, "w") as outfile:
+        with fopen(metadata_path, "w") as outfile:
             outfile.write(json.dumps(self.getMetadata()))
     
     @classmethod
@@ -373,8 +373,7 @@ class AxolotlRecord(ABC):
         if not check_file_exists(metadata_path):
             raise FileNotFoundError("can't find _metadata.json!")
         else:
-            # todo: load metadata in a flexible way (at this point this won't work on databricks)
-            with open(metadata_path) as infile:
+            with fopen(metadata_path) as infile:
                 metadata = json.load(infile)
             if metadata["class_name"] != cls.__name__:
                 raise TypeError("loaded class {} doesn't match the target class {}".format(
@@ -403,9 +402,8 @@ class AxolotlRecord(ABC):
         for key, table in self._data.items():
             table.store(path.join(data_folder, key), num_partitions)
             
-        # todo: store metadata in a flexible way (at this point this won't work on databricks)
         metadata_path = path.join(file_path, "_metadata.json")        
-        with open(metadata_path, "w") as outfile:
+        with fopen(metadata_path, "w") as outfile:
             outfile.write(json.dumps(self.getMetadata()))
 
 
