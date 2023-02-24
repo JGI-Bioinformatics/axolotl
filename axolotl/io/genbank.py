@@ -67,6 +67,7 @@ class gbkFeatIO(AxolotlIO):
                     for feature in record.features:
                         res.append({
                             "seq_id": record.id,
+                            "type": feature.type,
                             "location": [
                                 {
                                     "start": int(feature.location.start),
