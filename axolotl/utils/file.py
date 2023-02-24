@@ -89,7 +89,15 @@ def copy_file(source_path, target_path):
     if matches_source["type"] == "file":
         shutil.copyfile(matches_source["path"], matches_target["path"])
     elif matches_source["type"] == "dbfs":
-        raise NotImplementedError()
+        spark = SparkSession.getActiveSession()
+        if spark == None:
+            raise Exception("can't find any Spark active session!")        
+        try:
+            from pyspark.dbutils import DBUtils
+            dbutils = DBUtils(spark)
+            return dbutils.fs.cp(matches_source["path"], matches_target["path"])
+        except ImportError:
+            raise Exception("can't access DataBricks DBUtils")
     else:
         raise NotImplementedError()
         
@@ -103,7 +111,15 @@ def make_dirs(file_path):
     if matches["type"] == "file":
         return makedirs(path.abspath(matches["path"]))
     elif matches["type"] == "dbfs":
-        raise NotImplementedError()
+        spark = SparkSession.getActiveSession()
+        if spark == None:
+            raise Exception("can't find any Spark active session!")        
+        try:
+            from pyspark.dbutils import DBUtils
+            dbutils = DBUtils(spark)
+            return dbutils.fs.mkdirs("user/satria/test")
+        except ImportError:
+            raise Exception("can't access DataBricks DBUtils")
     else:
         raise NotImplementedError()
 
