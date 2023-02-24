@@ -31,7 +31,8 @@ setuptools.setup(
     python_requires=">=3.6",
     test_suite="tests",
     install_requires=[
-        "pyspark"
+        "pyspark",
+        "biopython"
     ],
     tests_require=[
     ],
