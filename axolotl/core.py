@@ -418,7 +418,7 @@ class recordIO(AxolotlIO):
         return cls._getOutputDFclass()(imported_data)
 
     @classmethod
-    def loadConcatenatedFiles(cls, file_pattern:str, minPartitions:int=None persist:bool=True, intermediate_pq_path:str="", params:Dict={}) -> ioDF:
+    def loadConcatenatedFiles(cls, file_pattern:str, minPartitions:int=None, persist:bool=True, intermediate_pq_path:str="", params:Dict={}) -> ioDF:
         imported_data = {}
         for key, data_class in cls._getOutputIOclasses().items():
             imported_data[key] = data_class.loadConcatenatedFiles(file_pattern, persist, intermediate_pq_path + "." + key, minPartitions=minPartitions, params=params)
