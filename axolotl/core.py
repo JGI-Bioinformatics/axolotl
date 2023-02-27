@@ -414,21 +414,21 @@ class recordIO(AxolotlIO):
     def loadSmallFiles(cls, file_pattern:str, minPartitions:int=None, params:Dict={}) -> ioDF:
         imported_data = {}
         for key, data_class in cls._getOutputIOclasses().items():
-            imported_data[key] = data_class.loadSmallFiles(file_pattern, minPartitions=minPartitions, params)
+            imported_data[key] = data_class.loadSmallFiles(file_pattern, minPartitions=minPartitions, params=params)
         return cls._getOutputDFclass()(imported_data)
 
     @classmethod
     def loadConcatenatedFiles(cls, file_pattern:str, minPartitions:int=None persist:bool=True, intermediate_pq_path:str="", params:Dict={}) -> ioDF:
         imported_data = {}
         for key, data_class in cls._getOutputIOclasses().items():
-            imported_data[key] = data_class.loadConcatenatedFiles(file_pattern, persist, intermediate_pq_path + "." + key, minPartitions=minPartitions, params)
+            imported_data[key] = data_class.loadConcatenatedFiles(file_pattern, persist, intermediate_pq_path + "." + key, minPartitions=minPartitions, params=params)
         return cls._getOutputDFclass()(imported_data)
         
     @classmethod
     def loadBigFiles(cls, file_paths:List[str], intermediate_pq_path:str, minPartitions:int=None, params:Dict={}) -> ioDF:
         imported_data = {}
         for key, data_class in cls._getOutputIOclasses().items():
-            imported_data[key] = data_class.loadBigFiles(file_paths, intermediate_pq_path + "." + key, params, minPartitions=minPartitions)
+            imported_data[key] = data_class.loadBigFiles(file_paths, intermediate_pq_path + "." + key, params=params, minPartitions=minPartitions)
         return cls._getOutputDFclass()(imported_data)
 
     @classmethod
