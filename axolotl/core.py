@@ -129,7 +129,7 @@ class AxolotlIO(ABC):
     """Axolotl basic Input/Output (mostly input) class"""
     
     @classmethod
-    def loadSmallFiles(cls, file_pattern:str, params:Dict={}) -> ioDF:
+    def loadSmallFiles(cls, file_pattern:str, minPartitions:int=None, params:Dict={}) -> ioDF:
         spark = SparkSession.getActiveSession()
         if spark == None:
             raise Exception("can't find any Spark active session!")
@@ -140,14 +140,14 @@ class AxolotlIO(ABC):
             raise TypeError("expected file_pattern to be a string")
             
         return cls._getOutputDFclass()(
-            sc.wholeTextFiles(file_pattern)\
+            sc.wholeTextFiles(file_pattern, minPartitions=minPartitions)\
             .reduceByKey(lambda row1, row2: row1)\
             .flatMap(lambda x: cls._parseFile(x[0], x[1], params))\
             .toDF(schema=cls._getOutputDFclass().getSchema())
         )        
 
     @classmethod
-    def loadConcatenatedFiles(cls, file_pattern:str, persist:bool=True, intermediate_pq_path:str="", params:Dict={}) -> ioDF:
+    def loadConcatenatedFiles(cls, file_pattern:str, minPartitions:int=None, persist:bool=True, intermediate_pq_path:str="", params:Dict={}) -> ioDF:
         spark = SparkSession.getActiveSession()
         if spark == None:
             raise Exception("can't find any Spark active session!")
@@ -173,7 +173,7 @@ class AxolotlIO(ABC):
         sc._jsc.hadoopConfiguration().set("textinputformat.record.delimiter", cls._getFileDelimiter()[0])
 
         # parse dataframe and evaluate
-        df = sc.textFile(file_pattern)\
+        df = sc.textFile(file_pattern, minPartitions=minPartitions)\
         .map(lambda x: x[:-1])\
         .filter(lambda x: x != "")\
         .map(lambda x: tuple(x.split(cls._getFileDelimiter()[1], 1)))\
@@ -200,7 +200,7 @@ class AxolotlIO(ABC):
         return cls._getOutputDFclass()(df)
         
     @classmethod
-    def loadBigFiles(cls, file_paths:List[str], intermediate_pq_path:str, params:Dict={}) -> ioDF:
+    def loadBigFiles(cls, file_paths:List[str], intermediate_pq_path:str, minPartitions:int=None, params:Dict={}) -> ioDF:
         spark = SparkSession.getActiveSession()
         if spark == None:
             raise Exception("can't find any Spark active session!")
@@ -247,14 +247,14 @@ class AxolotlIO(ABC):
             for file_path in file_paths:
                 print("INFO: parsing big file {}...".format(file_path))
                 # check partitioning
-                if sc.textFile(file_path).getNumPartitions() == 1:
+                if sc.textFile(file_path, minPartitions=minPartitions).getNumPartitions() == 1:
                     print((
                         "WARNING: loading {} only returned one partition,"
                         " use unzipped files whenever possible to allow splitting files"
                     ).format(file_path))
                 # parse
                 spark.createDataFrame(
-                    sc.textFile(file_path).filter(lambda x: x != "").map(
+                    sc.textFile(file_path, minPartitions=minPartitions).filter(lambda x: x != "").map(
                         lambda y: cls._parseRecord(y, params)
                     ).flatMap(lambda n: n).filter(lambda z: (z != None) if params.get("skip_malformed_record", False) else True),
                     schema=cls._getOutputDFclass()._getSchemaSpecific()
@@ -286,7 +286,7 @@ class AxolotlIO(ABC):
             raise TypeError("expected file_pattern to be a string")
         
         # import RDD
-        rdd_imported = sc.wholeTextFiles(file_pattern)\
+        rdd_imported = sc.wholeTextFiles(file_pattern, minPartitions=num_partitions)\
         .reduceByKey(lambda row1, row2: row1)\
         .map(lambda x: cls._getFileDelimiter()[0] + x[0] + cls._getFileDelimiter()[1] + x[1])\
         
