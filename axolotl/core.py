@@ -257,16 +257,20 @@ class AxolotlIO(ABC):
                         " use unzipped files whenever possible to allow splitting files"
                     ).format(file_path))
                 # parse
-                spark.createDataFrame(
+                _df = spark.createDataFrame(
                     sc.textFile(file_path, minPartitions=minPartitions).filter(lambda x: x != "").map(
                         lambda y: cls._parseRecord(y, params)
                     ).flatMap(lambda n: n).filter(lambda z: (z != None) if params.get("skip_malformed_record", False) else True),
                     schema=cls._getOutputDFclass()._getSchemaSpecific()
-                )\
-                .withColumn("row_id", monotonically_increasing_id())\
-                .withColumn("file_path", lit(file_path))\
+                )
+                _orig_cols = _df.columns
+                _df.withColumn("file_path", lit(file_path))\
+                    .withColumn("row_id", monotonically_increasing_id())\
+                    .select(["file_path", "row_id"] + _orig_cols)\
                 .write.mode('append').parquet(intermediate_pq_path)            
-                
+                del _df
+                del _orig_cols
+
             # revert delimiter back to what it was before
             if delim_default != None:
                 sc._jsc.hadoopConfiguration().set("textinputformat.record.delimiter", delim_default)
@@ -331,11 +335,11 @@ class AxolotlIO(ABC):
                 if parsed == None and params.get("skip_malformed_record", False):
                     continue
                 result.append({ # the ** is to concatenate the two dictionaries
-                    **parsed,
                     **{
-                        "row_id": i,
-                        "file_path": file_path
-                    }
+                        "file_path": file_path,
+                        "row_id": i
+                    },
+                    **parsed
                 })
                 i += 1 # TODO: this implementation will NOT produce uniqe IDs across partitions!!
         return result
