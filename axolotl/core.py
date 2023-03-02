@@ -7,7 +7,7 @@ from pyspark.sql import DataFrame, Row, types
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import lit, monotonically_increasing_id
 
-from axolotl.utils.file import check_file_exists, is_directory, make_dirs, fopen
+from axolotl.utils.file import check_file_exists, is_directory, make_dirs, fopen, parse_path_type
 
 from abc import ABC, abstractmethod
 from os import path
@@ -272,7 +272,7 @@ class AxolotlIO(ABC):
                     schema=cls._getOutputDFclass()._getSchemaSpecific()
                 )
                 _orig_cols = _df.columns
-                _df.withColumn("file_path", lit(file_path))\
+                _df.withColumn("file_path", lit(parse_path_type(file_path)["path"]))\
                     .withColumn("row_id", monotonically_increasing_id())\
                     .select(["file_path", "row_id"] + _orig_cols)\
                 .write.mode('append').parquet(intermediate_pq_path)            
@@ -343,7 +343,7 @@ class AxolotlIO(ABC):
                 if parsed == None and params.get("skip_malformed_record", False):
                     continue
                 if isinstance(parsed, list):
-                    result.append([file_path, i] + parsed)
+                    result.append([parse_path_type(file_path)["path"], i] + parsed)
                 elif isinstance(parsed, dict):
                     result.append({ # the ** is to concatenate the two dictionaries
                         **{
