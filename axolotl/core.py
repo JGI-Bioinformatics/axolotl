@@ -119,14 +119,18 @@ class ioDF(AxolotlDF):
     
     @classmethod
     def getSchema(cls) -> types.StructType:
-        return_type = types.StructType([
-            types.StructField("file_path", types.StringType()),
-            types.StructField("row_id", types.LongType())
-        ])
+        return_type = cls._getSchemaCommon()
         for field in cls._getSchemaSpecific():
             return_type = return_type.add(field)
         return return_type
     
+    @classmethod
+    def _getSchemaCommon(cls):
+        return types.StructType([
+            types.StructField("file_path", types.StringType()),
+            types.StructField("row_id", types.LongType())
+        ])
+
     @classmethod
     @abstractmethod
     def _getSchemaSpecific(cls):
@@ -338,13 +342,19 @@ class AxolotlIO(ABC):
             for parsed in parsed_array:
                 if parsed == None and params.get("skip_malformed_record", False):
                     continue
-                result.append({ # the ** is to concatenate the two dictionaries
-                    **{
-                        "file_path": file_path,
-                        "row_id": i
-                    },
-                    **parsed
-                })
+                if isinstance(parsed, list):
+                    result.append([file_path, i] + parsed)
+                elif isinstance(parsed, dict):
+                    result.append({ # the ** is to concatenate the two dictionaries
+                        **{
+                            "file_path": file_path,
+                            "row_id": i
+                        },
+                        **parsed
+                    })
+                else:
+                    raise NotImplementedError("_parseFile needs to return either lists of list or lists of dict")
+                
                 i += 1 # TODO: this implementation will NOT produce uniqe IDs across partitions!!
         return result
 
@@ -460,3 +470,70 @@ class recordIO(AxolotlIO):
     @classmethod
     def _parseFile(cls, file_path:str, text:str, params:Dict={}) -> List[Row]:
         raise NotImplementedError("can't call _parseFile() directly from a recordIO object")
+
+
+class TableDF(ioDF):
+    """base class for 'flexible' dataframes, i.e., where users can specify their own column schema"""
+
+    def getMetadata(self) -> dict:
+        metadata = super().getMetadata()
+        metadata["class_name"] = TableDF.__name__
+        return metadata
+
+    @classmethod
+    def validateRow(cls, row: Row) -> bool:
+        return True
+
+    @classmethod
+    def _getSchemaSpecific(cls) -> types.StructType:
+        raise NotImplementedError("calling an unimplemented abstract method _getSchemaSpecific()")
+    
+    @classmethod
+    def getSchema(cls) -> types.StructType:
+        return None
+
+
+class TableIO(AxolotlIO):
+    """base class for handling flexible tabular inputs, where column schema is user defined"""
+    
+    @classmethod
+    def _getTableDFclass(cls, colSchema:types.StructType) -> TableDF:
+        class InstanceTableDF(TableDF):
+            @classmethod
+            def getSchema(cls) -> types.StructType:
+                return_type = ioDF._getSchemaCommon()
+                for field in cls._getSchemaSpecific():
+                    return_type = return_type.add(field)
+                return return_type
+            @classmethod
+            def _getSchemaSpecific(cls) -> types.StructType:
+                return colSchema
+        return InstanceTableDF
+
+    @classmethod
+    def _getTableIOclass(cls, colSchema:types.StructType) -> AxolotlIO:
+        class InstanceTableIO(AxolotlIO):
+            @classmethod
+            def _getRecordDelimiter(clsI) -> str:
+                return cls._getRecordDelimiter()
+
+            @classmethod
+            def _getOutputDFclass(clsI) -> ioDF:
+                return TableIO._getTableDFclass(colSchema)
+
+            @classmethod
+            def _parseRecord(clsI, text:str, params:Dict={}) -> Dict:
+                return cls._parseRecord(text, params)
+        return InstanceTableIO
+
+    @classmethod
+    def loadSmallFiles(cls, file_pattern:str, colSchema:types.StructType, minPartitions:int=None, params:Dict={}) -> ioDF:
+        return cls._getTableIOclass(colSchema).loadSmallFiles(file_pattern, minPartitions=minPartitions, params=params)
+
+    @classmethod
+    def loadConcatenatedFiles(cls, file_pattern:str, colSchema:types.StructType, minPartitions:int=None, persist:bool=True, intermediate_pq_path:str="", params:Dict={}) -> ioDF:
+        return cls._getTableIOclass(colSchema).loadConcatenatedFiles(file_pattern, minPartitions=minPartitions, persist=persist, intermediate_pq_path=intermediate_pq_path, params=params)
+            
+    @classmethod
+    def loadBigFiles(cls, file_paths:List[str], intermediate_pq_path:str, colSchema:types.StructType, minPartitions:int=None, params:Dict={}) -> TableDF:                
+        return cls._getTableIOclass(colSchema).loadBigFiles(file_paths, intermediate_pq_path, minPartitions, params)
