@@ -57,10 +57,14 @@ class AxolotlDF(ABC):
             if not cls.getSchema() == None and cls.getSchema().jsonValue() != metadata["schema"]:
                 raise AttributeError("schema conflict on the loaded parquet file")
         
+        used_schema = cls.getSchema()
+        if used_schema == None:
+            used_schema = types.StructType.fromJson(metadata["schema"])
+
         if num_partitions > 0:
-            return cls(spark.read.schema(cls.getSchema()).parquet(src_parquet).repartition(num_partitions))
+            return cls(spark.read.schema(used_schema).parquet(src_parquet).repartition(num_partitions))
         else:
-            return cls(spark.read.schema(cls.getSchema()).parquet(src_parquet))
+            return cls(spark.read.schema(used_schema).parquet(src_parquet))
     
     def store(self, parquet_file_path:str, num_partitions:int=-1):
         if check_file_exists(parquet_file_path):
