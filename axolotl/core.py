@@ -115,9 +115,13 @@ class ioDF(AxolotlDF):
     
     @classmethod
     def getSchema(cls) -> types.StructType:
-        return cls._getSchemaSpecific()\
-            .add(types.StructField("row_id", types.LongType()))\
-            .add(types.StructField("file_path", types.StringType()))
+        return_type = types.StructType([
+            types.StructField("file_path", types.StringType()),
+            types.StructField("row_id", types.LongType())
+        ])
+        for field in cls._getSchemaSpecific():
+            return_type = return_type.add(field)
+        return return_type
     
     @classmethod
     @abstractmethod
