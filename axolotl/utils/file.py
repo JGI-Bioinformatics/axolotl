@@ -3,7 +3,7 @@ from pyspark.sql import SparkSession
 from os import path, makedirs
 import re
 import shutil
-
+import gzip
 
 def parse_path_type(file_path):
     matches = re.match(
@@ -29,7 +29,7 @@ def check_file_exists(file_path):
     elif matches["type"] == "dbfs":
         spark = SparkSession.getActiveSession()
         if spark == None:
-            raise Exception("can't find any Spark active session!")        
+            raise Exception("can't find any Spark active session!")
         try:
             from pyspark.dbutils import DBUtils
             dbutils = DBUtils(spark)
@@ -131,5 +131,29 @@ def fopen(file_path, mode="r"):
         return open(matches["path"], mode)
     elif matches["type"] == "dbfs":
         return open(path.join("/dbfs", matches["path"]), mode)
+    else:
+        raise NotImplementedError()
+
+
+def gunzip_deflate(input_zipped, output_path):
+    matches_source = parse_path_type(input_zipped)
+    matches_target = parse_path_type(output_path)
+    
+    # for now we will only handle same-type paths (e.g., local+local or dbfs+dbfs)
+    if matches_source["type"] != matches_target["type"]:
+        raise Exception("source_path and target_path needs to be the same type")
+    
+    if check_file_exists(output_path):
+        raise Exception("target path exists!")
+    
+    if is_directory(input_zipped):
+        raise Exception("source_path is a directory!")
+
+    if matches_source["type"] == "file":
+        with gzip.open(matches_source["path"], 'rb') as f_in:
+            with open(matches_target["path"], 'wb') as f_out:
+                shutil.copyfileobj(f_in, f_out)
+    elif matches_source["type"] == "dbfs":
+        raise NotImplementedError()
     else:
         raise NotImplementedError()

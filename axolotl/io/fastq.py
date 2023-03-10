@@ -10,6 +10,9 @@ from axolotl.core import AxolotlIO
 from axolotl.data.seq import ReadSeqDF
 from typing import Dict, List
 
+from axolotl.utils.file import parse_path_type, fopen, gunzip_deflate
+from os import path
+
 
 class FastqIO(AxolotlIO):
 
@@ -46,6 +49,23 @@ class FastqIO(AxolotlIO):
     @classmethod
     def _getOutputDFclass(cls) -> ReadSeqDF:
         return ReadSeqDF
+    
+    @classmethod
+    def _prepInput(cls, file_path:str, tmp_dir:str) -> str:
+        match = parse_path_type(file_path)
+
+        if len(list(filter(match["path"].endswith, [".fastq", ".fq"]))) > 0:
+            # no preprocessing needed
+            return file_path
+        elif len(list(filter(match["path"].endswith, [".fastq.gz", ".fq.gz"]))) > 0:
+            # unzip fastq into the temp folder
+            output_path = path.join(tmp_dir, "extracted.fastq")
+            gunzip_deflate(file_path, output_path)
+            return output_path
+        else:
+            raise Exception("can't recognize file extension")
+
+        return file_path
     
     @classmethod
     def _parseRecord(cls, text:str, params:Dict={}) -> Dict:
