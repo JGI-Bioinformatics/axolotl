@@ -368,7 +368,7 @@ class AxolotlRecord(ABC):
     """base class for holding record-type objects, which serve as a 'dataset' of multiple linked AxolotlDFs"""
 
     _data = {} # this holds all the AxolotlDF objects i.e., dataset tables; don't modify this directly
-    def data(self, key:str) -> AxolotlDF:
+    def get(self, key:str) -> AxolotlDF:
         return self._data[key]
 
     def getMetadata(self) -> Dict:
