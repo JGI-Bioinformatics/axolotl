@@ -138,6 +138,21 @@ class ioDF(AxolotlDF):
         raise NotImplementedError("calling an unimplemented abstract method _getSchemaSpecific()")
 
 
+class MetaDF(ioDF):
+    """dataframe to handle 'metadata', i.e., key-value pairs of a file"""
+        
+    @classmethod
+    def _getSchemaSpecific(cls) -> types.StructType:
+        return types.StructType([
+            types.StructField("key", types.StringType()),
+            types.StructField("value", types.StringType())
+        ])
+        
+    @classmethod
+    def validateRow(cls, row: Row) -> bool:
+        return True
+
+
 class AxolotlIO(ABC):
     """Axolotl basic Input/Output (mostly input) class"""
     
