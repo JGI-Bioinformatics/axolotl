@@ -21,7 +21,7 @@ class AxolotlDF(ABC):
     """Axoltl basic DataFrame class"""
 
     def __init__(self, df:DataFrame):
-        if not self.getSchema() == None and self.__class__.getSchema().jsonValue() != df.schema.jsonValue():
+        if (self.getSchema() is not None) and (self.__class__.getSchema().jsonValue() != df.schema.jsonValue()):
             raise AttributeError((
                 "schema conflict on the loaded DataFrame object,"
                 " please use schema={}.getSchema() when creating the"
@@ -51,11 +51,8 @@ class AxolotlDF(ABC):
             with fopen(metadata_path) as infile:
                 metadata = json.load(infile)
             if metadata["class_name"] != cls.__name__:
-                raise TypeError("trying to load {} parquet file into a {}".format(
-                    metadata["class_name"],
-                    cls.__name__
-                ))
-            if not cls.getSchema() == None and cls.getSchema().jsonValue() != metadata["schema"]:
+                raise TypeError(f"trying to load {metadata['class_name']} parquet file into a {cls.__name__}")
+            if (cls.getSchema() is not None) and (cls.getSchema().jsonValue() != metadata["schema"]):
                 raise AttributeError("schema conflict on the loaded parquet file")
         
         used_schema = cls.getSchema()
@@ -67,7 +64,7 @@ class AxolotlDF(ABC):
         else:
             return cls(spark.read.schema(used_schema).parquet(src_parquet))
     
-    def store(self, parquet_file_path:str, num_partitions:int=-1):
+    def store(self, parquet_file_path:str, num_partitions:int=-1) -> None:
         if check_file_exists(parquet_file_path):
             raise Exception("path exists! {}".format(parquet_file_path))
         if num_partitions > 0:
@@ -76,7 +73,8 @@ class AxolotlDF(ABC):
             self.df.write.option("schema", self.__class__.getSchema()).parquet(parquet_file_path)
         metadata_path = path.join(parquet_file_path, ".axolotl_metadata.json")        
         with fopen(metadata_path, "w") as outfile:
-            outfile.write(json.dumps(self.getMetadata()))
+            json.dump(self.getMetadata(), outfile)
+
     
     @classmethod
     @abstractmethod
