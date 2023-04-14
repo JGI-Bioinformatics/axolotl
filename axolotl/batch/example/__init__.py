@@ -14,7 +14,7 @@ module-specific help message
 from typing import List
 
 
-def run_module(input_file: str, target_root_folder: str, params: List={}) -> int:
+def run_module(input_file: str, target_root_folder: str, params: List=[]) -> int:
 	print("example module successfully ran! input_file=%s target_folder=%s params=%s" % (input_file, target_root_folder, params))
 	return 1
 
