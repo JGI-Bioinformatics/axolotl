@@ -46,10 +46,18 @@ def show_help(mode:str=None) -> int:
 
 
 def run_batch_pipeline(params:List[str]) -> int:
-    spark_master_ip = os.environ.get("AXOLOTL_DRIVER", "local")
-    spark = SparkSession.builder.master(spark_master_ip).getOrCreate()
-    if spark == None:
-        raise Exception("can't find any Spark active session!")
+    spark_master_ip = os.environ.get("AXOLOTL_RUNNER", "local[*]")
+    spark = SparkSession.builder.master(spark_master_ip)
+    spark_config_file = os.environ.get("AXOLOTL_RUNNER_CONFIG", None)
+    if spark_config_file:
+        with open(spark_config_file, "r") as ii:
+            for line in ii:
+                line = line.rstrip("\n")
+                if line != "":
+                    key, val = line.split("\t")
+                    spark = spark.config(key, val)
+
+    spark = spark.getOrCreate()
     sc = spark.sparkContext
 
     # check if runner exists
@@ -82,7 +90,7 @@ def run_batch_pipeline(params:List[str]) -> int:
         return 1
 
     # run module in parallel
-    results = sc.parallelize(input_file_paths).map(lambda x: runner.run_module(x, output_root_dir, runner_params))
+    results = sc.parallelize(input_file_paths, numSlices=len(input_file_paths)).map(lambda x: runner.run_module(x, output_root_dir, runner_params))
 
     # call
     row_combiner = (lambda x, y: (x[0]+1 if y==-1 else x[0], x[1]+1 if y==0 else x[1], x[2]+1 if y==1 else x[2]))
