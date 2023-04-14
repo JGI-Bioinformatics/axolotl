@@ -10,6 +10,7 @@ setuptools.setup(
     name="axolotl",
     version="0.2.0",
     scripts=[
+        "axolotl/axolotl"
     ],
     author="Joint Genome Institute - Genome Analysis R&D",
     author_email="zhongwang@lbl.gov",
