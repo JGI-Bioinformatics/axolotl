@@ -18,17 +18,18 @@ from tempfile import TemporaryDirectory
 
 
 class AxolotlDF(ABC):
-    """Axoltl basic DataFrame class"""
+    """Axoltl basic DataFrame class
+    
+    Overload the pySpark's dataframe so that it contains metadata to describe the dataframe. Each column can still have its own metadata.
+    Load/store AxolotlDF handle both data and metadata.
+
+    Example:
+    
+    """
 
     def __init__(self, df:DataFrame):
         if (self.getSchema() is not None) and (self.__class__.getSchema().jsonValue() != df.schema.jsonValue()):
-            raise AttributeError((
-                "schema conflict on the loaded DataFrame object,"
-                " please use schema={}.getSchema() when creating the"
-                " pySpark DataFrame object"
-            ).format(
-                self.__class__.__name__
-            ))
+            raise AttributeError(f"schema conflict on the loaded DataFrame object, please use schema={self.__class__.__name__}.getSchema() when creating the pySpark DataFrame object")
         self.df = df
     
     def getMetadata(self) -> dict:
@@ -39,7 +40,7 @@ class AxolotlDF(ABC):
         return metadata
 
     @classmethod
-    def load(cls, src_parquet:str, num_partitions:int=-1):
+    def load(cls, src_parquet:str, num_partitions:int=200):
         spark = SparkSession.getActiveSession()
         if spark == None:
             raise Exception("can't find any Spark active session!")        
@@ -59,18 +60,18 @@ class AxolotlDF(ABC):
         if used_schema == None:
             used_schema = types.StructType.fromJson(metadata["schema"])
 
-        if num_partitions > 0:
+        if num_partitions !=200:
             return cls(spark.read.schema(used_schema).parquet(src_parquet).repartition(num_partitions))
         else:
             return cls(spark.read.schema(used_schema).parquet(src_parquet))
     
-    def store(self, parquet_file_path:str, num_partitions:int=-1) -> None:
-        if check_file_exists(parquet_file_path):
-            raise Exception("path exists! {}".format(parquet_file_path))
-        if num_partitions > 0:
-            self.df.repartition(num_partitions).write.option("schema", self.__class__.getSchema()).parquet(parquet_file_path)
+    def store(self, parquet_file_path:str, overwrite=False, num_partitions:int=200) -> None:
+        if check_file_exists(parquet_file_path) and (not overwrite):
+            raise Exception(f"path exists! {parquet_file_path}, please set overwrite to True.")
+        if num_partitions != 200:
+            self.df.repartition(num_partitions).write.mode("overwrite").option("schema", self.__class__.getSchema()).parquet(parquet_file_path)
         else:
-            self.df.write.option("schema", self.__class__.getSchema()).parquet(parquet_file_path)
+            self.df.write.mode("overwrite").option("schema", self.__class__.getSchema()).parquet(parquet_file_path)
         metadata_path = path.join(parquet_file_path, ".axolotl_metadata.json")        
         with fopen(metadata_path, "w") as outfile:
             json.dump(self.getMetadata(), outfile)
@@ -155,7 +156,7 @@ class AxolotlIO(ABC):
     """Axolotl basic Input/Output (mostly input) class"""
     
     @classmethod
-    def loadSmallFiles(cls, file_pattern:str, minPartitions:int=None, params:Dict={}) -> ioDF:
+    def loadSmallFiles(cls, file_pattern:str, minPartitions:int=200, params:Dict={}) -> ioDF:
         spark = SparkSession.getActiveSession()
         if spark == None:
             raise Exception("can't find any Spark active session!")
@@ -173,7 +174,7 @@ class AxolotlIO(ABC):
         )        
 
     @classmethod
-    def loadConcatenatedFiles(cls, file_pattern:str, minPartitions:int=None, persist:bool=True, intermediate_pq_path:str="", params:Dict={}) -> ioDF:
+    def loadConcatenatedFiles(cls, file_pattern:str, minPartitions:int=200, persist:bool=True, intermediate_pq_path:str="", params:Dict={}) -> ioDF:
         spark = SparkSession.getActiveSession()
         if spark == None:
             raise Exception("can't find any Spark active session!")
@@ -226,7 +227,7 @@ class AxolotlIO(ABC):
         return cls._getOutputDFclass()(df)
         
     @classmethod
-    def loadBigFiles(cls, file_paths:List[str], intermediate_pq_path:str, minPartitions:int=None, params:Dict={}) -> ioDF:
+    def loadBigFiles(cls, file_paths:List[str], intermediate_pq_path:str, minPartitions:int=200, params:Dict={}) -> ioDF:
         spark = SparkSession.getActiveSession()
         if spark == None:
             raise Exception("can't find any Spark active session!")
@@ -404,7 +405,7 @@ class AxolotlRecord(ABC):
         raise NotImplementedError("calling an unimplemented abstract method _dataDesc()")
         
     @classmethod
-    def load(cls, file_path:str, num_partitions:int=-1):
+    def load(cls, file_path:str, num_partitions:int=200):
         spark = SparkSession.getActiveSession()
         if spark == None:
             raise Exception("can't find any Spark active session!")        
@@ -431,16 +432,16 @@ class AxolotlRecord(ABC):
                 
             return cls(imported_data)
     
-    def store(self, file_path:str, num_partitions:int=-1):
-        if check_file_exists(file_path):
-            raise Exception("path exists! {}".format(file_path))
+    def store(self, file_path:str, num_partitions:int=200, overwrite=False):
+        if check_file_exists(file_path) and (not overwrite):
+            raise Exception(f"path exists! {file_path} Please set overwrite to True.")
         
         make_dirs(file_path)
         data_folder = path.join(file_path, "data")
         make_dirs(data_folder)
         
         for key, table in self._data.items():
-            table.store(path.join(data_folder, key), num_partitions)
+            table.store(path.join(data_folder, key), num_partitions, overwrite=overwrite)
             
         metadata_path = path.join(file_path, "_metadata.json")        
         with fopen(metadata_path, "w") as outfile:
