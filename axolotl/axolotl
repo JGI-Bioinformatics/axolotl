@@ -46,19 +46,10 @@ def show_help(mode:str=None) -> int:
 
 
 def run_batch_pipeline(params:List[str]) -> int:
-    spark_master_ip = os.environ.get("AXOLOTL_RUNNER", "local[*]")
-    spark = SparkSession.builder.master(spark_master_ip)
-    spark_config_file = os.environ.get("AXOLOTL_RUNNER_CONFIG", None)
-    if spark_config_file:
-        with open(spark_config_file, "r") as ii:
-            for line in ii:
-                line = line.rstrip("\n")
-                if line != "":
-                    key, val = line.split("\t")
-                    spark = spark.config(key, val)
 
-    spark = spark.getOrCreate()
-    sc = spark.sparkContext
+    if len(params) < 1:
+        show_help("batch")
+        return 0
 
     # check if runner exists
     runner_name = params[0]
@@ -90,6 +81,19 @@ def run_batch_pipeline(params:List[str]) -> int:
         return 1
 
     # run module in parallel
+    spark_master_ip = os.environ.get("AXOLOTL_RUNNER", "local[*]")
+    spark = SparkSession.builder.master(spark_master_ip)
+    spark_config_file = os.environ.get("AXOLOTL_RUNNER_CONFIG", None)
+    if spark_config_file:
+        with open(spark_config_file, "r") as ii:
+            for line in ii:
+                line = line.rstrip("\n")
+                if line != "":
+                    key, val = line.split("\t")
+                    spark = spark.config(key, val)
+
+    spark = spark.getOrCreate()
+    sc = spark.sparkContext
     results = sc.parallelize(input_file_paths, numSlices=len(input_file_paths)).map(lambda x: runner.run_module(x, output_root_dir, runner_params))
 
     # call
