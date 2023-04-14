@@ -452,21 +452,21 @@ class recordIO(AxolotlIO):
     """base class for implementing AxolotlRecord-based files parsing, this wraps multiple different AxolotlIO into one"""
     
     @classmethod
-    def loadSmallFiles(cls, file_pattern:str, minPartitions:int=None, params:Dict={}) -> ioDF:
+    def loadSmallFiles(cls, file_pattern:str, minPartitions:int=200, params:Dict={}) -> ioDF:
         imported_data = {}
         for key, data_class in cls._getOutputIOclasses().items():
             imported_data[key] = data_class.loadSmallFiles(file_pattern, minPartitions=minPartitions, params=params)
         return cls._getOutputDFclass()(imported_data)
 
     @classmethod
-    def loadConcatenatedFiles(cls, file_pattern:str, minPartitions:int=None, persist:bool=True, intermediate_pq_path:str="", params:Dict={}) -> ioDF:
+    def loadConcatenatedFiles(cls, file_pattern:str, minPartitions:int=200, persist:bool=True, intermediate_pq_path:str="", params:Dict={}) -> ioDF:
         imported_data = {}
         for key, data_class in cls._getOutputIOclasses().items():
             imported_data[key] = data_class.loadConcatenatedFiles(file_pattern, persist, intermediate_pq_path + "." + key, minPartitions=minPartitions, params=params)
         return cls._getOutputDFclass()(imported_data)
         
     @classmethod
-    def loadBigFiles(cls, file_paths:List[str], intermediate_pq_path:str, minPartitions:int=None, params:Dict={}) -> ioDF:
+    def loadBigFiles(cls, file_paths:List[str], intermediate_pq_path:str, minPartitions:int=200, params:Dict={}) -> ioDF:
         imported_data = {}
         for key, data_class in cls._getOutputIOclasses().items():
             imported_data[key] = data_class.loadBigFiles(file_paths, intermediate_pq_path + "." + key, params=params, minPartitions=minPartitions)
@@ -546,13 +546,13 @@ class TableIO(AxolotlIO):
         return InstanceTableIO
 
     @classmethod
-    def loadSmallFiles(cls, file_pattern:str, colSchema:types.StructType, minPartitions:int=None, params:Dict={}) -> ioDF:
+    def loadSmallFiles(cls, file_pattern:str, colSchema:types.StructType, minPartitions:int=200, params:Dict={}) -> ioDF:
         return cls._getTableIOclass(colSchema).loadSmallFiles(file_pattern, minPartitions=minPartitions, params=params)
 
     @classmethod
-    def loadConcatenatedFiles(cls, file_pattern:str, colSchema:types.StructType, minPartitions:int=None, persist:bool=True, intermediate_pq_path:str="", params:Dict={}) -> ioDF:
+    def loadConcatenatedFiles(cls, file_pattern:str, colSchema:types.StructType, minPartitions:int=200, persist:bool=True, intermediate_pq_path:str="", params:Dict={}) -> ioDF:
         return cls._getTableIOclass(colSchema).loadConcatenatedFiles(file_pattern, minPartitions=minPartitions, persist=persist, intermediate_pq_path=intermediate_pq_path, params=params)
             
     @classmethod
-    def loadBigFiles(cls, file_paths:List[str], intermediate_pq_path:str, colSchema:types.StructType, minPartitions:int=None, params:Dict={}) -> TableDF:                
+    def loadBigFiles(cls, file_paths:List[str], intermediate_pq_path:str, colSchema:types.StructType, minPartitions:int=200, params:Dict={}) -> TableDF:                
         return cls._getTableIOclass(colSchema).loadBigFiles(file_paths, intermediate_pq_path, minPartitions, params)
