@@ -6,7 +6,7 @@ TODO:
 - implement paired reads parsing
 """
 
-from axolotl.core import AxolotlIO
+from axolotl.core import AxlIO
 from axolotl.data.seq import ReadSeqDF
 from typing import Dict, List
 
@@ -14,7 +14,7 @@ from axolotl.utils.file import parse_path_type, fopen, gunzip_deflate
 from os import path
 
 
-class FastqIO(AxolotlIO):
+class FastqIO(AxlIO):
 
     # quality metrics
     QUAL_PHRED33 = {

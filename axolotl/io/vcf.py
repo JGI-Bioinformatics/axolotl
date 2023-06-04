@@ -4,7 +4,7 @@ Contain classes definition for loading VCF genotype files
 
 """
 
-from axolotl.core import AxolotlRecord, AxolotlIO, recordIO, MetaDF, ioDF
+from axolotl.core import AxlSet, AxlIO, setIO, MetaDF, ioDF
 from axolotl.utils.file import fopen
 from typing import List, Dict, Tuple
 from os import path
@@ -13,7 +13,7 @@ from axolotl.data.genotype import vcfDF
 from axolotl.data.record import vcfRecord
 
 
-class vcfMetaIO(AxolotlIO):
+class vcfMetaIO(AxlIO):
         
     @classmethod
     def _getRecordDelimiter(cls) -> str:
@@ -69,7 +69,7 @@ class vcfMetaIO(AxolotlIO):
             return [None]
         
         
-class vcfDataIO(AxolotlIO):
+class vcfDataIO(AxlIO):
     
     @classmethod
     def _getRecordDelimiter(cls) -> str:
@@ -89,7 +89,7 @@ class vcfDataIO(AxolotlIO):
             return [cols]
         
         
-class vcfIO(recordIO):
+class vcfIO(setIO):
         
     @classmethod
     def _getOutputIOclasses(cls) -> Dict:
@@ -99,5 +99,5 @@ class vcfIO(recordIO):
         }
     
     @classmethod
-    def _getOutputDFclass(cls) -> AxolotlRecord:
+    def _getOutputDFclass(cls) -> AxlSet:
         return vcfRecord

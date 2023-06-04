@@ -4,11 +4,11 @@ Contain classes definition for loading genbank annotation and sequence data
 
 TODO:
 - parse contigs metadata
-- add more interactivity (more like from the base AxolotlRecord object)
+- add more interactivity (more like from the base AxlSet object)
 """
 
-from axolotl.core import recordIO, AxolotlIO
-from axolotl.core import AxolotlRecord
+from axolotl.core import setIO, AxlIO
+from axolotl.core import AxlSet
 from axolotl.data.record import gbkRecord
 from axolotl.data.feature import FeatDF
 from axolotl.data.seq import NuclSeqDF
@@ -19,7 +19,7 @@ from io import StringIO
 from typing import Dict
 
 
-class gbkSeqIO(AxolotlIO):
+class gbkSeqIO(AxlIO):
         
     @classmethod
     def _getRecordDelimiter(cls) -> str:
@@ -49,7 +49,7 @@ class gbkSeqIO(AxolotlIO):
         return NuclSeqDF
 
 
-class gbkFeatIO(AxolotlIO):
+class gbkFeatIO(AxlIO):
         
     @classmethod
     def _getRecordDelimiter(cls) -> str:
@@ -95,7 +95,7 @@ class gbkFeatIO(AxolotlIO):
         return FeatDF
 
     
-class gbkIO(recordIO):
+class gbkIO(setIO):
     
     
     @classmethod
@@ -106,5 +106,5 @@ class gbkIO(recordIO):
         }
     
     @classmethod
-    def _getOutputDFclass(cls) -> AxolotlRecord:
+    def _getOutputDFclass(cls) -> AxlSet:
         return gbkRecord

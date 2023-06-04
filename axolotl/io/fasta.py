@@ -5,12 +5,12 @@ Contain classes definition for loading proteins and nucleotides FASTA data.
 TODO:
 """
 
-from axolotl.core import AxolotlIO
+from axolotl.core import AxlIO
 from axolotl.data.seq import NuclSeqDF, ProtSeqDF
 from typing import Dict
 
 
-class FastaIO(AxolotlIO):
+class FastaIO(AxlIO):
     
     @classmethod
     def _getRecordDelimiter(cls) -> str:

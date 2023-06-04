@@ -17,11 +17,11 @@ import glob
 from tempfile import TemporaryDirectory
 
 
-class AxolotlDF(ABC):
+class AxlDF(ABC):
     """Axoltl basic DataFrame class
     
     Overload the pySpark's dataframe so that it contains metadata to describe the dataframe. Each column can still have its own metadata.
-    Load/store AxolotlDF handle both data and metadata.
+    Load/store AxlDF handle both data and metadata.
 
     Example:
     
@@ -115,7 +115,7 @@ class AxolotlDF(ABC):
         )
 
 
-class ioDF(AxolotlDF):
+class ioDF(AxlDF):
     
     @classmethod
     def getSchema(cls) -> types.StructType:
@@ -152,7 +152,7 @@ class MetaDF(ioDF):
         return True
 
 
-class AxolotlIO(ABC):
+class AxlIO(ABC):
     """Axolotl basic Input/Output (mostly input) class"""
     
     @classmethod
@@ -299,7 +299,7 @@ class AxolotlIO(ABC):
                     else:
                         sc._jsc.hadoopConfiguration().unset("textinputformat.record.delimiter")
             
-        # load DF from the intermediate parquet path, then output AxolotlDF
+        # load DF from the intermediate parquet path, then output AxlDF
         return cls._getOutputDFclass()(spark.read.parquet(intermediate_pq_path))        
 
     @classmethod
@@ -378,11 +378,11 @@ class AxolotlIO(ABC):
         return result
 
 
-class AxolotlRecord(ABC):
-    """base class for holding record-type objects, which serve as a 'dataset' of multiple linked AxolotlDFs"""
+class AxlSet(ABC):
+    """base class for holding record-type objects, which serve as a 'dataset' of multiple linked AxlDFs"""
 
-    _data = {} # this holds all the AxolotlDF objects i.e., dataset tables; don't modify this directly
-    def get(self, key:str) -> AxolotlDF:
+    _data = {} # this holds all the AxlDF objects i.e., dataset tables; don't modify this directly
+    def get(self, key:str) -> AxlDF:
         return self._data[key]
 
     def getMetadata(self) -> Dict:
@@ -448,8 +448,8 @@ class AxolotlRecord(ABC):
             outfile.write(json.dumps(self.getMetadata()))
 
 
-class recordIO(AxolotlIO):
-    """base class for implementing AxolotlRecord-based files parsing, this wraps multiple different AxolotlIO into one"""
+class setIO(AxlIO):
+    """base class for implementing AxlSet-based files parsing, this wraps multiple different AxlIO into one"""
     
     @classmethod
     def loadSmallFiles(cls, file_pattern:str, minPartitions:int=200, params:Dict={}) -> ioDF:
@@ -479,24 +479,24 @@ class recordIO(AxolotlIO):
         
     @classmethod
     @abstractmethod
-    def _getOutputDFclass(cls) -> AxolotlRecord:
+    def _getOutputDFclass(cls) -> AxlSet:
         raise NotImplementedError("calling an unimplemented abstract method _getOutputDFclass()")
     
     @classmethod
     def _parseRecord(cls, text:str, params:Dict={}) -> Dict:
-        raise NotImplementedError("can't call _parseRecord() directly from a recordIO object")
+        raise NotImplementedError("can't call _parseRecord() directly from a setIO object")
 
     @classmethod
     def _parseFile(cls, file_path:str, text:str, params:Dict={}) -> List[Row]:
-        raise NotImplementedError("can't call _parseFile() directly from a recordIO object")
+        raise NotImplementedError("can't call _parseFile() directly from a setIO object")
 
 
-class TableDF(ioDF):
+class FlexDF(ioDF):
     """base class for 'flexible' dataframes, i.e., where users can specify their own column schema"""
 
     def getMetadata(self) -> dict:
         metadata = super().getMetadata()
-        metadata["class_name"] = TableDF.__name__
+        metadata["class_name"] = FlexDF.__name__
         return metadata
 
     @classmethod
@@ -512,12 +512,12 @@ class TableDF(ioDF):
         return None
 
 
-class TableIO(AxolotlIO):
+class FlexIO(AxlIO):
     """base class for handling flexible tabular inputs, where column schema is user defined"""
     
     @classmethod
-    def _getTableDFclass(cls, colSchema:types.StructType) -> TableDF:
-        class InstanceTableDF(TableDF):
+    def _getFlexDFclass(cls, colSchema:types.StructType) -> FlexDF:
+        class _tempFlexDF(FlexDF):
             @classmethod
             def getSchema(cls) -> types.StructType:
                 return_type = ioDF._getSchemaCommon()
@@ -527,32 +527,32 @@ class TableIO(AxolotlIO):
             @classmethod
             def _getSchemaSpecific(cls) -> types.StructType:
                 return colSchema
-        return InstanceTableDF
+        return _tempFlexDF
 
     @classmethod
-    def _getTableIOclass(cls, colSchema:types.StructType) -> AxolotlIO:
-        class InstanceTableIO(AxolotlIO):
+    def _getFlexIOclass(cls, colSchema:types.StructType) -> AxlIO:
+        class _tempFlexIO(AxlIO):
             @classmethod
             def _getRecordDelimiter(clsI) -> str:
                 return cls._getRecordDelimiter()
 
             @classmethod
             def _getOutputDFclass(clsI) -> ioDF:
-                return TableIO._getTableDFclass(colSchema)
+                return FlexIO._getFlexDFclass(colSchema)
 
             @classmethod
             def _parseRecord(clsI, text:str, params:Dict={}) -> Dict:
                 return cls._parseRecord(text, params)
-        return InstanceTableIO
+        return _tempFlexIO
 
     @classmethod
     def loadSmallFiles(cls, file_pattern:str, colSchema:types.StructType, minPartitions:int=200, params:Dict={}) -> ioDF:
-        return cls._getTableIOclass(colSchema).loadSmallFiles(file_pattern, minPartitions=minPartitions, params=params)
+        return cls._getFlexIOclass(colSchema).loadSmallFiles(file_pattern, minPartitions=minPartitions, params=params)
 
     @classmethod
     def loadConcatenatedFiles(cls, file_pattern:str, colSchema:types.StructType, minPartitions:int=200, persist:bool=True, intermediate_pq_path:str="", params:Dict={}) -> ioDF:
-        return cls._getTableIOclass(colSchema).loadConcatenatedFiles(file_pattern, minPartitions=minPartitions, persist=persist, intermediate_pq_path=intermediate_pq_path, params=params)
+        return cls._getFlexIOclass(colSchema).loadConcatenatedFiles(file_pattern, minPartitions=minPartitions, persist=persist, intermediate_pq_path=intermediate_pq_path, params=params)
             
     @classmethod
-    def loadBigFiles(cls, file_paths:List[str], intermediate_pq_path:str, colSchema:types.StructType, minPartitions:int=200, params:Dict={}) -> TableDF:                
-        return cls._getTableIOclass(colSchema).loadBigFiles(file_paths, intermediate_pq_path, minPartitions, params)
+    def loadBigFiles(cls, file_paths:List[str], intermediate_pq_path:str, colSchema:types.StructType, minPartitions:int=200, params:Dict={}) -> FlexDF:                
+        return cls._getFlexIOclass(colSchema).loadBigFiles(file_paths, intermediate_pq_path, minPartitions, params)

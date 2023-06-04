@@ -3,11 +3,11 @@
 Contain classes definition for loading CSV files (or any custom delimiters)
 """
 
-from axolotl.core import TableIO
+from axolotl.core import FlexIO
 from typing import Dict
 
 
-class csvIO(TableIO):
+class csvIO(FlexIO):
     @classmethod
     def _getRecordDelimiter(clsI) -> str:
         return "\n"
