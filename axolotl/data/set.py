@@ -1,6 +1,6 @@
-"""axolotl.data.record
+"""axolotl.data.set
 
-Contain classes definition for record-type (multi-dataframes) data
+Contain classes definition for record-type (multi-dataframes dataset) data
 """
 
 from axolotl.data.feature import FeatDF
@@ -11,7 +11,7 @@ from axolotl.core import AxlSet, MetaDF
 from typing import Dict
 
 
-class gbkRecord(AxlSet):
+class gbkSet(AxlSet):
 
     @classmethod
     def _dataDesc(cls) -> Dict:
@@ -21,7 +21,7 @@ class gbkRecord(AxlSet):
         }
 
 
-class vcfRecord(AxlSet):
+class vcfSet(AxlSet):
 
     @classmethod
     def _dataDesc(cls) -> Dict:

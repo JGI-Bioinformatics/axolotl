@@ -9,7 +9,7 @@ TODO:
 
 from axolotl.core import setIO, AxlIO
 from axolotl.core import AxlSet
-from axolotl.data.record import gbkRecord
+from axolotl.data.set import gbkSet
 from axolotl.data.feature import FeatDF
 from axolotl.data.seq import NuclSeqDF
 
@@ -107,4 +107,4 @@ class gbkIO(setIO):
     
     @classmethod
     def _getOutputDFclass(cls) -> AxlSet:
-        return gbkRecord
+        return gbkSet
