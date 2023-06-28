@@ -23,7 +23,7 @@ class gff3IO(AxlIO):
                 quals = {}
                 if len(cols) == 9:
                     for pair in cols[8].split(";"):
-                        key, val = pair.split("=")
+                        key, val = pair.split("=") if "=" in pair else [key, ""]
                         if key not in quals:
                             quals[key] = []
                         quals[key].extend(val.split(","))
