@@ -436,12 +436,13 @@ class AxlSet(ABC):
         if check_file_exists(file_path) and (not overwrite):
             raise Exception(f"path exists! {file_path} Please set overwrite to True.")
         
-        make_dirs(file_path)
         data_folder = path.join(file_path, "data")
-        make_dirs(data_folder)
+        if not overwrite:
+            make_dirs(file_path)
+            make_dirs(data_folder)
         
         for key, table in self._data.items():
-            table.store(path.join(data_folder, key), num_partitions, overwrite=overwrite)
+            table.store(path.join(data_folder, key), num_partitions=num_partitions, overwrite=overwrite)
             
         metadata_path = path.join(file_path, "_metadata.json")        
         with fopen(metadata_path, "w") as outfile:
