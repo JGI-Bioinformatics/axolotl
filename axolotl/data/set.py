@@ -20,6 +20,14 @@ class gbkSet(AxlSet):
             "annotation": FeatDF
         }
 
+    @classmethod
+    def create(cls, sequence: NuclSeqDF, annotation: FeatDF):
+        return cls({
+            "sequence": sequence,
+            "annotation": annotation
+        })
+
+
 
 class vcfSet(AxlSet):
 

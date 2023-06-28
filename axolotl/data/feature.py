@@ -11,7 +11,7 @@ from axolotl.core import ioDF
 
 
 class FeatDF(ioDF):
-    """actual annotation dataframe based on GenBank features"""
+    """actual raw annotation dataframe based on GenBank/GFF features"""
     
     @classmethod
     def _getSchemaSpecific(cls) -> types.StructType:
