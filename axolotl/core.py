@@ -168,7 +168,6 @@ class AxlIO(ABC):
             
         return cls._getOutputDFclass()(
             sc.wholeTextFiles(file_pattern, minPartitions=minPartitions)\
-            .reduceByKey(lambda row1, row2: row1)\
             .flatMap(lambda x: cls._parseFile(x[0], x[1], params))\
             .toDF(schema=cls._getOutputDFclass().getSchema())
         )        
@@ -204,7 +203,6 @@ class AxlIO(ABC):
         .map(lambda x: x[:-1])\
         .filter(lambda x: x != "")\
         .map(lambda x: tuple(x.split(cls._getFileDelimiter()[1], 1)))\
-        .reduceByKey(lambda row1, row2: (row1[0], row1[1], params))\
         .flatMap(lambda x: cls._parseFile(x[0], x[1], params))\
         .toDF(schema=cls._getOutputDFclass().getSchema())
         
@@ -236,9 +234,6 @@ class AxlIO(ABC):
         # input check
         if not isinstance(intermediate_pq_path, str):
             raise TypeError("expected intermediate_pq_path to be a string")
-        
-        # remove double filepaths
-        file_paths = set(file_paths)
 
         # check if previously processed
         use_preprocessed = False
