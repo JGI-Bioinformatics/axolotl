@@ -4,14 +4,14 @@ This is the main entry point for Axolotl's command line applications
 
 example usage:
 
-- axolotl batch antismash "/home/user/genome_files/*" "/home/user/bgcs/"
+- axolotl run antismash "/home/user/genome_files/*" "/home/user/bgcs/"
 - axolotl help
-- axolotl help batch
+- axolotl help run
 """
 
 from pyspark.sql import SparkSession
 from sys import argv
-from axolotl.batch import get_module_data
+from axolotl.run import get_module_data
 from glob import glob
 from typing import List
 import os
