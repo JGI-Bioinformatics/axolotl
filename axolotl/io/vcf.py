@@ -10,7 +10,7 @@ from typing import List, Dict, Tuple
 from os import path
 
 from axolotl.data.genotype import vcfDF
-from axolotl.data.record import vcfRecord
+from axolotl.data.set import vcfSet
 
 
 class vcfMetaIO(AxlIO):
@@ -100,4 +100,4 @@ class vcfIO(setIO):
     
     @classmethod
     def _getOutputDFclass(cls) -> AxlSet:
-        return vcfRecord
+        return vcfSet
