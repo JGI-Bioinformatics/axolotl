@@ -16,6 +16,7 @@ class FeatDF(ioDF):
     @classmethod
     def _getSchemaSpecific(cls) -> types.StructType:
         return types.StructType([
+            types.StructField("source_path", types.StringType()),
             types.StructField("seq_id", types.StringType()),
             types.StructField("type", types.StringType()),
             types.StructField("location", types.ArrayType(

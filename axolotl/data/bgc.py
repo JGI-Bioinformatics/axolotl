@@ -15,6 +15,7 @@ class bgcDF(ioDF):
     @classmethod
     def _getSchemaSpecific(cls) -> types.StructType:
         return types.StructType([
+            types.StructField("source_path", types.StringType()),
             types.StructField("seq_id", types.StringType()),
             types.StructField("location", types.StructType([
                 types.StructField("start", types.LongType()),
@@ -43,6 +44,7 @@ class bgcDF(ioDF):
                 .rdd.map(lambda row: Row(
                 file_path=row.file_path,
                 row_id=row.row_id,
+                source_path=row.source_path,
                 seq_id=row.seq_id,
                 location={
                     "start": min([loc.start for loc in row.location]),
@@ -58,6 +60,7 @@ class bgcDF(ioDF):
                 .rdd.map(lambda row: Row(
                 file_path=row.file_path,
                 row_id=row.row_id,
+                source_path=row.source_path,
                 seq_id=row.seq_id,
                 location={
                     "start": min([loc.start for loc in row.location]),
