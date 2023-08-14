@@ -25,8 +25,8 @@ class FastaIO(AxlIO):
             return [{
                 "seq_id": rows[0].split(" ", 1)[0],
                 "desc": rows[0].split(" ", 1)[1] if " " in rows[0] else "",
-                "sequence": rows[1],
-                "length": len(rows[1])
+                "sequence": "".join(rows[1:]),
+                "length": sum(map(len, rows[1:]))
             }]
         except:
             print("WARNING: failed parsing a malformed record text '{}'".format(
