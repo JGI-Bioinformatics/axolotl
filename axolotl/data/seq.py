@@ -52,10 +52,23 @@ class NuclSeqDF(SeqDF):
     @classmethod
     def getAllowedLetters(cls) -> str:
         return "ATGCNatgcn"
-    
+
     @classmethod
     def validateRowSpecific(cls, row: Row) -> bool:
         return True
+
+    @classmethod
+    def fetch_seq(seq, loc):
+        reverse = loc.strand == -1
+        if reverse:
+            convert = {
+            "A": "T", "T": "A", "G": "C", "C": "G",
+            "a": "t", "t": "a", "g": "c", "c": "g"
+            }
+            snippet = "".join([convert.get(c, c) for c in seq[loc.end-1:loc.start-2:-1]])
+        else:
+            snippet = seq[loc.start-1:loc.end]
+        return snippet
 
 
 class ProtSeqDF(SeqDF):
