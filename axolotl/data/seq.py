@@ -8,6 +8,7 @@ from pyspark.sql import SparkSession
 from abc import abstractmethod
 
 from axolotl.core import ioDF
+from typing import Dict
 
 
 class SeqDF(ioDF):
@@ -58,7 +59,7 @@ class NuclSeqDF(SeqDF):
         return True
 
     @classmethod
-    def fetch_seq(seq, loc):
+    def fetch_seq(cls, seq:str, loc:Dict):
         reverse = loc.strand == -1
         if reverse:
             convert = {
