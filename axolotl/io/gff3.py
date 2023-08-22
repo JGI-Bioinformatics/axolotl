@@ -7,6 +7,8 @@ from axolotl.core import AxlIO
 from axolotl.data.feature import FeatDF
 from typing import Dict
 
+import pyspark.sql.functions as F
+from pyspark.sql.types import StringType
 
 class gff3IO(AxlIO):
         
@@ -23,7 +25,7 @@ class gff3IO(AxlIO):
                 quals = {}
                 if len(cols) == 9:
                     for pair in cols[8].split(";"):
-                        key, val = pair.split("=") if "=" in pair else [key, ""]
+                        key, val = pair.split("=") if "=" in pair else [pair, ""]
                         if key not in quals:
                             quals[key] = []
                         quals[key].extend(val.split(","))
@@ -51,3 +53,13 @@ class gff3IO(AxlIO):
     @classmethod
     def _getOutputDFclass(cls) -> FeatDF:
         return FeatDF
+
+    @classmethod
+    def _postprocess(cls, data:ioDF, params:Dict={}) -> Dict:
+        if "source_path_func" in params:
+            processing_func = params["source_path_func"]
+        else:
+            def processing_func(gff_path):
+                return gff_path[::-1].replace(".gff"[::-1], ".fna"[::-1], 1)[::-1]
+        data.df = data.df.withColumn("source_path", F.udf(processing_func, StringType())("file_path"))
+        return data

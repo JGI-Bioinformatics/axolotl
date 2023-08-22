@@ -166,11 +166,11 @@ class AxlIO(ABC):
         if not isinstance(file_pattern, str):
             raise TypeError("expected file_pattern to be a string")
             
-        return cls._getOutputDFclass()(
+        return cls.__postprocess(cls._getOutputDFclass()(
             sc.wholeTextFiles(file_pattern, minPartitions=minPartitions)\
             .flatMap(lambda x: cls._parseFile(x[0], x[1], params))\
             .toDF(schema=cls._getOutputDFclass().getSchema())
-        )        
+        ), params=params)
 
     @classmethod
     def loadConcatenatedFiles(cls, file_pattern:str, minPartitions:int=200, persist:bool=True, intermediate_pq_path:str="", params:Dict={}) -> ioDF:
@@ -222,7 +222,7 @@ class AxlIO(ABC):
         else:
             sc._jsc.hadoopConfiguration().unset("textinputformat.record.delimiter")
             
-        return cls._getOutputDFclass()(df)
+        return cls.__postprocess(cls._getOutputDFclass()(df), params=params)
         
     @classmethod
     def loadBigFiles(cls, file_paths:List[str], intermediate_pq_path:str, minPartitions:int=200, params:Dict={}) -> ioDF:
@@ -295,7 +295,7 @@ class AxlIO(ABC):
                         sc._jsc.hadoopConfiguration().unset("textinputformat.record.delimiter")
             
         # load DF from the intermediate parquet path, then output AxlDF
-        return cls._getOutputDFclass()(spark.read.parquet(intermediate_pq_path))        
+        return cls.__postprocess(cls._getOutputDFclass()(spark.read.parquet(intermediate_pq_path)), params=params)
 
     @classmethod
     def concatSmallFiles(cls, file_pattern:str, path_output:str, num_partitions:int=-1):
@@ -371,6 +371,16 @@ class AxlIO(ABC):
                 
                 i += 1 # TODO: this implementation will NOT produce uniqe IDs across partitions!!
         return result
+    
+    @classmethod
+    def __postprocess(cls, data:ioDF, params:Dict={}):
+        data.df = data.df.withColumn("row_id", monotonically_increasing_id())
+        data = cls._postprocess(data, params)
+        return data
+    
+    @classmethod
+    def _postprocess(cls, data:ioDF, params:Dict={}) -> Dict:
+        return data
 
 
 class AxlSet(ABC):
