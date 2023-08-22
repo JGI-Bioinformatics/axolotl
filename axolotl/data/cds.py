@@ -11,6 +11,7 @@ from axolotl.data.feature import FeatDF
 from axolotl.data.seq import NuclSeqDF
 import pyspark.sql.functions as F
 
+from Bio.Seq import Seq
 
 class cdsDF(ioDF):
         
@@ -40,42 +41,6 @@ class cdsDF(ioDF):
     @classmethod
     def validateRow(cls, row: Row) -> bool:
         return row.aa_sequence != None
-
-    @classmethod
-    def translate_seq(cls, seq, transl_table="1"):
-        transl_ref_text = {
-            "11": (
-              "    AAs  = FFLLSSSSYY**CC*WLLLLPPPPHHQQRRRRIIIMTTTTNNKKSSRRVVVVAAAADDEEGGGG"
-              "  Starts = ---M------**--*----M------------MMMM---------------M------------"
-              "  Base1  = TTTTTTTTTTTTTTTTCCCCCCCCCCCCCCCCAAAAAAAAAAAAAAAAGGGGGGGGGGGGGGGG"
-              "  Base2  = TTTTCCCCAAAAGGGGTTTTCCCCAAAAGGGGTTTTCCCCAAAAGGGGTTTTCCCCAAAAGGGG"
-              "  Base3  = TCAGTCAGTCAGTCAGTCAGTCAGTCAGTCAGTCAGTCAGTCAGTCAGTCAGTCAGTCAGTCAG"
-            )
-        }
-        transl_ref = {}
-        for x, text in transl_ref_text.items():
-            transl_ref[x] = {}
-            text = text.replace(" ", "")
-            rows = text.split("=")
-            aas = rows[1].replace("Starts", "")
-            starts = rows[2].replace("Base1", "")
-            base1 = rows[3].replace("Base2", "")
-            base2 = rows[4].replace("Base3", "")
-            base3 = rows[5]
-            for i, aa in enumerate(aas):
-                codon = base1[i] + base2[i] + base3[i]
-                transl_ref[x][codon] = (aa, starts[i])
-
-        if transl_table not in transl_ref:
-            return None
-        
-        codons = []
-        i = 0
-        while i+3 < len(seq):
-            codons.append(seq[i:i+3])
-            i += 3
-        aa_seq = "".join([transl_ref[transl_table].get(codon, ("X", "X"))[0] for codon in codons])
-        return aa_seq
 
     @classmethod
     def fromFeatDF(cls, data: FeatDF, contigs: NuclSeqDF=None):
@@ -114,7 +79,10 @@ class cdsDF(ioDF):
             
             translated = joined.rdd.flatMap(
                 lambda row: zip(row["row_ids"], [
-                    cls.translate_seq(NuclSeqDF.fetch_seq(row["sequence"], loc), row["transl_tables"][i]) for i, loc in enumerate(row["locations"])
+                    str(Seq.translate(
+                        NuclSeqDF.fetch_seq(row["sequence"], loc),
+                        table = int(row["transl_tables"][i]) if row["transl_tables"][i] else "Standard"
+                    ).rstrip("*")) for i, loc in enumerate(row["locations"])
                 ])
             ).toDF(["row_id", "seq"])
 
