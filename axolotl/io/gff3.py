@@ -3,7 +3,7 @@
 Contain classes definition for loading gff3 annotation data
 """
 
-from axolotl.core import AxlIO
+from axolotl.core import AxlIO, ioDF
 from axolotl.data.feature import FeatDF
 from typing import Dict
 
