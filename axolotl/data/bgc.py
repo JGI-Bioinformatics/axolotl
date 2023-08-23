@@ -10,6 +10,8 @@ from typing import List, Dict
 from axolotl.core import ioDF
 from axolotl.data.feature import FeatDF
 
+import pyspark.sql.functions as F
+
 class bgcDF(ioDF):
     
     @classmethod
@@ -37,7 +39,7 @@ class bgcDF(ioDF):
         return True
 
     @classmethod
-    def fromFeatDF(cls, data: FeatDF, source_type: str="antismash"):
+    def fromFeatDF(cls, data: FeatDF, source_type: str="antismash", reindex: bool=True):
         
         if source_type == "antismash":
             df = data.df.filter("type = 'region'")\
@@ -71,5 +73,10 @@ class bgcDF(ioDF):
                 on_contig_edge=([q.values[0] == "True" for q in row.qualifiers if q.key == "contig_edge"][0:1] or [None])[0],
                 other_qualifiers=[q for q in row.qualifiers if q.key not in ["product", "contig_edge"]]
             )).toDF(cls.getSchema())
-        
+
+        if reindex:
+            df = df.withColumn(
+                "row_id", F.when(F.lit(True), F.monotonically_increasing_id())
+            )
+                
         return cls(df)
