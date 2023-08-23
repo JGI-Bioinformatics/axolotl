@@ -71,7 +71,7 @@ class bgcDF(ioDF):
                 },
                 classes=([q.values for q in row.qualifiers if q.key == "BGC_Class"][0:1] or [[]])[0],
                 on_contig_edge=([q.values[0] == "True" for q in row.qualifiers if q.key == "contig_edge"][0:1] or [None])[0],
-                other_qualifiers=[q for q in row.qualifiers if q.key not in ["product", "contig_edge"]]
+                other_qualifiers=[q for q in row.qualifiers if q.key not in ["BGC_Class", "contig_edge"]]
             )).toDF(cls.getSchema())
 
         if reindex:
