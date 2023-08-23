@@ -62,9 +62,12 @@ class cdsDF(ioDF):
                 "strand": row.location[0].strand if len(set([loc.strand for loc in row.location])) == 1 else 0
             },
             other_qualifiers=[q for q in row.qualifiers if q.key not in ["locus_tag", "gene", "product", "translation", "transl_table"]]
-        )).withColumn(
-            "row_id", F.monotonically_increasing_id()
-        ).toDF(cls.getSchema())
+        )).toDF(cls.getSchema())
+
+        if reindex:
+            cds_df = cds_df.withColumn(
+                "row_id", F.when(F.lit(True), F.monotonically_increasing_id())
+            )
         
         if contigs is None: # return as is
             return cls(cds_df)
