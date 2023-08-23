@@ -128,7 +128,7 @@ class ioDF(AxlDF):
     def _getSchemaCommon(cls):
         return types.StructType([
             types.StructField("file_path", types.StringType()),
-            types.StructField("row_id", types.LongType())
+            types.StructField("row_id", types.LongType(), False)
         ])
 
     @classmethod

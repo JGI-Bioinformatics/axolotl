@@ -43,7 +43,7 @@ class cdsDF(ioDF):
         return row.aa_sequence != None
 
     @classmethod
-    def fromFeatDF(cls, data: FeatDF, contigs: NuclSeqDF=None):
+    def fromFeatDF(cls, data: FeatDF, contigs: NuclSeqDF=None, reindex: bool=True):
 
         cds_df = data.df.filter("type = 'CDS'")\
             .rdd.map(lambda row: Row(
@@ -62,7 +62,9 @@ class cdsDF(ioDF):
                 "strand": row.location[0].strand if len(set([loc.strand for loc in row.location])) == 1 else 0
             },
             other_qualifiers=[q for q in row.qualifiers if q.key not in ["locus_tag", "gene", "product", "translation", "transl_table"]]
-        )).toDF(cls.getSchema())
+        )).withColumn(
+            "row_id", F.monotonically_increasing_id()
+        ).toDF(cls.getSchema())
         
         if contigs is None: # return as is
             return cls(cds_df)
