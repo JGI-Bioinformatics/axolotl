@@ -5,7 +5,7 @@ Contain core classes and functions
 
 from pyspark.sql import DataFrame, Row, types
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import lit, monotonically_increasing_id
+from pyspark.sql.functions import lit, monotonically_increasing_id, when
 
 from axolotl.utils.file import check_file_exists, is_directory, make_dirs, fopen, parse_path_type
 
@@ -128,7 +128,7 @@ class ioDF(AxlDF):
     def _getSchemaCommon(cls):
         return types.StructType([
             types.StructField("file_path", types.StringType()),
-            types.StructField("row_id", types.LongType(), False)
+            types.StructField("row_id", types.LongType())
         ])
 
     @classmethod
@@ -282,7 +282,7 @@ class AxlIO(ABC):
                     )
                     _orig_cols = _df.columns
                     _df.withColumn("file_path", lit(parse_path_type(file_path)["path"]))\
-                        .withColumn("row_id", monotonically_increasing_id())\
+                        .withColumn("row_id", lit(0))\
                         .select(["file_path", "row_id"] + _orig_cols)\
                     .write.mode('append').parquet(intermediate_pq_path)            
                     del _df
@@ -374,7 +374,7 @@ class AxlIO(ABC):
     
     @classmethod
     def __postprocess(cls, data:ioDF, params:Dict={}):
-        data.df = data.df.withColumn("row_id", monotonically_increasing_id())
+        data.df = data.df.withColumn("row_id", when(lit(True), monotonically_increasing_id()))
         data = cls._postprocess(data, params)
         return data
     
