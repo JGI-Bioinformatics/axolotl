@@ -9,6 +9,7 @@ from pyspark.sql import Row, types, DataFrame
 from typing import List, Dict
 from axolotl.core import ioDF
 from axolotl.data.feature import FeatDF
+from axolotl.data.seq import NuclSeqDF
 
 import pyspark.sql.functions as F
 
