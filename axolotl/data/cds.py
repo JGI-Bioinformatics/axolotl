@@ -14,7 +14,14 @@ import pyspark.sql.functions as F
 from Bio.Seq import Seq
 
 class cdsDF(ioDF):
-        
+
+    @classmethod
+    def translate_seq(cls, seq, transl_table):
+        try:
+            return str(Seq.translate(seq, int(transl_table) if transl_table else "Standard")).rstrip("*")
+        except:
+            return None
+
     @classmethod
     def _getSchemaSpecific(cls) -> types.StructType:
         return types.StructType([
@@ -84,10 +91,10 @@ class cdsDF(ioDF):
             
             translated = joined.rdd.flatMap(
                 lambda row: zip(row["row_ids"], [
-                    str(Seq.translate(
+                    (cls.translate_seq(
                         NuclSeqDF.fetch_seq(row["sequence"], loc),
-                        table = int(row["transl_tables"][i]) if row["transl_tables"][i] else "Standard"
-                    ).rstrip("*")) for i, loc in enumerate(row["locations"])
+                        row["transl_tables"][i]
+                    )) for i, loc in enumerate(row["locations"])
                 ])
             ).toDF(["row_id", "seq"])
 
