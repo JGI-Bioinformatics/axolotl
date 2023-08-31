@@ -59,7 +59,7 @@ class bgcDF(ioDF):
                 classes=([q.values for q in row.qualifiers if q.key == "product"][0:1] or [[]])[0],
                 on_contig_edge=([q.values[0] == "True" for q in row.qualifiers if q.key == "contig_edge"][0:1] or [None])[0],
                 other_qualifiers=[q for q in row.qualifiers if q.key not in ["product", "contig_edge"]]
-            )).toDF(cls.getSchema())
+            )).toDF(cls.getSchema()).filter((F.size(F.col("classes")) > 0))
         elif source_type == "smc":
             df = data.df.filter("type = 'cluster'")\
                 .rdd.map(lambda row: Row(
@@ -76,7 +76,7 @@ class bgcDF(ioDF):
                 classes=([q.values for q in row.qualifiers if q.key == "BGC_Class"][0:1] or [[]])[0],
                 on_contig_edge=None,
                 other_qualifiers=[q for q in row.qualifiers if q.key not in ["BGC_Class", "contig_edge"]]
-            )).toDF(cls.getSchema())
+            )).toDF(cls.getSchema()).filter((F.size(F.col("classes")) > 0))
 
         if reindex:
             df = df.withColumn(
