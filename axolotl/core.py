@@ -27,7 +27,7 @@ class AxlDF(ABC):
     """
 
     def __init__(self, df:DataFrame):
-        if (self.getSchema() is not None) and (self.__class__.getSchema().jsonValue() != df.schema.jsonValue()):
+        if (self.__class__.getSchema() is not None) and (self.__class__.getSchema().jsonValue() != df.schema.jsonValue()):
             raise AttributeError(f"schema conflict on the loaded DataFrame object, please use schema={self.__class__.__name__}.getSchema() when creating the pySpark DataFrame object")
         self.df = df
     
@@ -287,8 +287,8 @@ class AxlIO(ABC):
                         schema=cls._getOutputDFclass()._getSchemaSpecific()
                     )
                     _orig_cols = _df.columns
-                    _df.withColumn("file_path", lit(parse_path_type(file_path)["path"]))\
-                        .withColumn("row_id", lit(0))\
+                    _df.withColumn("file_path", when(lit(True), lit(parse_path_type(file_path)["path"])))\
+                        .withColumn("row_id", when(lit(True), lit(0)))\
                         .select(["file_path", "row_id"] + _orig_cols)\
                     .write.mode('append').parquet(intermediate_pq_path)            
                     del _df
