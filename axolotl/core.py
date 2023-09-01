@@ -7,14 +7,13 @@ from pyspark.sql import DataFrame, Row, types
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import lit, monotonically_increasing_id, when
 
-from axolotl.utils.file import check_file_exists, is_directory, make_dirs, fopen, parse_path_type
+from axolotl.utils.file import check_file_exists, is_directory, make_dirs, fopen, parse_path_type, get_temp_dir
 
 from abc import ABC, abstractmethod
 from os import path
 from typing import List, Dict, Tuple
 import json
 import glob
-from tempfile import TemporaryDirectory
 
 
 class AxlDF(ABC):
@@ -265,10 +264,18 @@ class AxlIO(ABC):
             for file_path in file_paths:
                 print("INFO: parsing big file {}...".format(file_path))
                 
-                with TemporaryDirectory() as tmp_dir:
+                with get_temp_dir() as axl_tmp_dir:
+
+                    tmp_dir = axl_tmp_dir.dir_path
+                    use_dbfs = False
+                    if tmp_dir.startswith("dbfs:/"):
+                        tmp_dir = tmp_dir.replace("dbfs:/", "/dbfs/", 1)
+                        use_dbfs = True
 
                     # run preprocessing if necessary
                     text_file_path = cls._prepInput(file_path, tmp_dir)
+                    if use_dbfs:
+                        text_file_path = text_file_path.replace("/dbfs/", "dbfs:/", 1)
                     
                     # change delimiter for the custom textFiles() function
                     delim_default = sc._jsc.hadoopConfiguration().get("textinputformat.record.delimiter")

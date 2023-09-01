@@ -157,3 +157,62 @@ def gunzip_deflate(input_zipped, output_path):
         raise NotImplementedError()
     else:
         raise NotImplementedError()
+
+
+def get_temp_dir(suffix=None, prefix=None, dir=None):
+    spark = SparkSession.getActiveSession()
+    if spark == None:
+        raise Exception("can't find any Spark active session!")
+    in_databricks = False
+    try:
+        from pyspark.dbutils import DBUtils
+        dbutils = DBUtils(spark)
+        in_databricks = True
+    except:
+        pass
+
+    class AxlTempDir:
+
+        from random import randint
+        from tempfile import mkdtemp
+        from os import rmdir, path
+
+        dir_path = None
+        in_databricks = None
+        def __init__(self, in_databricks, suffix=None, prefix=None, dir=None):
+            if not in_databricks:
+                self.dir_path = mkdtemp(suffix=suffix, prefix=prefix, dir=dir)
+                self.in_databricks = False
+            else:
+                num_tries = 0
+                from pyspark.dbutils import DBUtils
+                dbutils = DBUtils(spark)
+                self.in_databricks = True
+                while not self.dir_path and num_tries < 5:
+                    num_tries += 1
+                    try:
+                        dir_path = path.join(
+                            dir or "dbfs:/tmp",
+                            "{}{:016d}{}/".format(
+                                prefix or "",
+                                randint(1, (10**16) - 1),
+                                suffix or ""
+                            )
+                        )
+                        dbutils.fs.mkdirs(dir_path)
+                        self.dir_path = dir_path
+                        return
+                    except:
+                        pass
+                raise Exception("failed to create dbfs temp dir")
+        def __del__(self):
+            pass
+        def __enter__(self):
+            return self.dir_path
+        def __exit__(self, exc_type, exc_value, traceback):
+            if not self.in_databricks:
+                rmdir(self.dir_path)
+            else:
+                dbutils.fs.rm(self.dir_path, True)
+
+    return AxlTempDir(in_databricks, suffix=suffix, prefix=prefix, dir=dir)
