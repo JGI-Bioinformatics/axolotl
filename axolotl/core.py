@@ -288,7 +288,7 @@ class AxlIO(ABC):
                     )
                     _orig_cols = _df.columns
                     _df.withColumn("file_path", when(lit(True), lit(parse_path_type(file_path)["path"])))\
-                        .withColumn("row_id", when(lit(True), lit(0)))\
+                        .withColumn("row_id", when(lit(True), lit(0).cast("long")))\
                         .select(["file_path", "row_id"] + _orig_cols)\
                     .write.mode('append').parquet(intermediate_pq_path)            
                     del _df
