@@ -1,9 +1,12 @@
 # axolotl utils
 from pyspark.sql import SparkSession
-from os import path, makedirs
+from os import path, makedirs, rmdir
 import re
 import shutil
 import gzip
+from random import randint
+from tempfile import mkdtemp
+
 
 def parse_path_type(file_path):
     matches = re.match(
@@ -172,11 +175,6 @@ def get_temp_dir(suffix=None, prefix=None, dir=None):
         pass
 
     class AxlTempDir:
-
-        from random import randint
-        from tempfile import mkdtemp
-        from os import rmdir, path
-
         dir_path = None
         in_databricks = None
         def __init__(self, in_databricks, suffix=None, prefix=None, dir=None):

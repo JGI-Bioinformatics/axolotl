@@ -264,9 +264,8 @@ class AxlIO(ABC):
             for file_path in file_paths:
                 print("INFO: parsing big file {}...".format(file_path))
                 
-                with get_temp_dir() as axl_tmp_dir:
+                with get_temp_dir() as tmp_dir:
 
-                    tmp_dir = axl_tmp_dir.dir_path
                     use_dbfs = False
                     if tmp_dir.startswith("dbfs:/"):
                         tmp_dir = tmp_dir.replace("dbfs:/", "/dbfs/", 1)
