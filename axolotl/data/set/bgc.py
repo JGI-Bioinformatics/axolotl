@@ -30,7 +30,7 @@ class bgcSet(AxlSet):
         return {
             "cds": cdsDF,
             "bgc": bgcDF,
-            "cds_to_bgc": cdsbgcDF
+            "cds_to_bgc": cls.__cdsbgcDF
         }
 
     @classmethod
@@ -46,8 +46,6 @@ class bgcSet(AxlSet):
             F.when(F.lit(True), bgc.df.row_id).alias("bgc_id"),
             F.when(F.lit(True), cds.df.row_id).alias("cds_id")
         )
-        cds_bgc_df.persist()
-        cds_bgc_df.count()
         
         return cls({
             "cds": cdsDF(cds_bgc_df.join(cds.df.alias("cds"), [
