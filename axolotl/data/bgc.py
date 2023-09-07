@@ -86,8 +86,6 @@ class bgcDF(ioDF):
         if contigs is None: # return as is
             return cls(df)
         else: # given contigs df, also try grab nt_sequence data
-            df.persist()
-            df.count()
             contig_df = contigs.df
             bgcs_lists = df.groupBy(["source_path", "seq_id"]).agg(
                 F.collect_list("row_id").alias("row_ids"),

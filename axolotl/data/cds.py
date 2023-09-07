@@ -79,8 +79,6 @@ class cdsDF(ioDF):
         if contigs is None: # return as is
             return cls(cds_df)
         else: # given contigs df, also try to translate missing CDS translations
-            cds_df.persist()
-            cds_df.count()
             contig_df = contigs.df
             missing_cds = cds_df.filter("aa_sequence is NULL").fillna("", ["transl_table"]).groupBy(["source_path", "seq_id"]).agg(
                 F.collect_list("row_id").alias("row_ids"),
