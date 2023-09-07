@@ -392,7 +392,6 @@ class AxlIO(ABC):
 class AxlSet(ABC):
     """base class for holding record-type objects, which serve as a 'dataset' of multiple linked AxlDFs"""
 
-    _data = {} # this holds all the AxlDF objects i.e., dataset tables; don't modify this directly
     def get(self, key:str) -> AxlDF:
         return self._data[key]
 
@@ -403,6 +402,7 @@ class AxlSet(ABC):
         return metadata
 
     def __init__(self, imported_data):
+        self._data = {}
         for key, data_class in self.__class__._dataDesc().items():
             if key not in imported_data:
                 raise Exception("need data -> '{}'".format(key))
