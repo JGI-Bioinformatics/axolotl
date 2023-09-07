@@ -6,6 +6,7 @@ from axolotl.core import AxlDF
 from axolotl.data.cds import cdsDF
 from axolotl.data.bgc import bgcDF
 from axolotl.core import AxlSet, MetaDF
+import pyspark.sql.functions as F
 import pyspark.sql.types as T
 from pyspark.sql import Row
 from typing import Dict
