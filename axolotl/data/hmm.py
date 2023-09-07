@@ -12,6 +12,7 @@ from pyhmmer.easel import TextSequence, Alphabet
 from pyspark.sql import Row
 
 import pyspark.sql.functions as F
+import pyspark.sql.types as T
 
 
 class hmmscanDF(AxlDF):
@@ -37,7 +38,7 @@ class hmmscanDF(AxlDF):
         return True
     
     @classmethod
-    def fromCdsDF(cls, cds_df: cdsDF, hmm_db_path: str) -> hmmscanDF:
+    def scanCDS(cls, cds_df: cdsDF, hmm_db_path: str) -> hmmscanDF:
 
         def _run_hmmscan(rows: List[Row], hmm_db_path: str, num_cpus: int=1):
             hmm_file = HMMFile(hmm_db_path).optimized_profiles()
