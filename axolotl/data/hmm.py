@@ -38,7 +38,7 @@ class hmmscanDF(AxlDF):
         return True
     
     @classmethod
-    def scanCDS(cls, cds_df: cdsDF, hmm_db_path: str) -> hmmscanDF:
+    def scanCDS(cls, cds_df: cdsDF, hmm_db_path: str):
 
         def _run_hmmscan(rows: List[Row], hmm_db_path: str, num_cpus: int=1):
             hmm_file = HMMFile(hmm_db_path).optimized_profiles()
