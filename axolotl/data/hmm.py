@@ -21,10 +21,10 @@ class hmmscanDF(AxlDF):
     @classmethod
     def getSchema(cls) -> T.StructType:
         return T.StructType([
-            T.StructField("cds_id", T.LongType()),
-            T.StructField("cds_from", T.LongType()),
-            T.StructField("cds_to", T.LongType()),
-            T.StructField("cds_gaps", T.ArrayType(T.LongType())),
+            T.StructField("query_name", T.StringType()),
+            T.StructField("query_from", T.LongType()),
+            T.StructField("query_to", T.LongType()),
+            T.StructField("query_gaps", T.ArrayType(T.LongType())),
             T.StructField("hmm_db_path", T.StringType()),
             T.StructField("hmm_acc", T.StringType()),
             T.StructField("hmm_name", T.StringType()),
@@ -43,7 +43,7 @@ class hmmscanDF(AxlDF):
         hmm_file = HMMFile(hmm_db_path).optimized_profiles()
         sequences_pyhmmer = (
             TextSequence(
-                name=bytes(str(row["row_id"]), "utf-8"),
+                name=bytes(row["name"], "utf-8"),
                 sequence=row["aa_sequence"]
             ).digitize(Alphabet.amino()) for row in rows if row["aa_sequence"]
         )
@@ -51,10 +51,10 @@ class hmmscanDF(AxlDF):
         for tophit in pyhmmscan(sequences_pyhmmer, hmm_file, cpus=num_cpus, T=T, E=E, bit_cutoffs=use_cutoff):
             for hit in tophit:
                 results.append({
-                    "cds_id": int(tophit.query_name),
-                    "cds_from": hit.best_domain.alignment.target_from,
-                    "cds_to": hit.best_domain.alignment.target_to,
-                    "cds_gaps": [i+1 for i, c in enumerate(str(hit.best_domain.alignment.target_sequence)) if c == '-'],
+                    "query_name": tophit.query_name.decode("utf-8"),
+                    "query_from": hit.best_domain.alignment.target_from,
+                    "query_to": hit.best_domain.alignment.target_to,
+                    "query_gaps": [i+1 for i, c in enumerate(str(hit.best_domain.alignment.target_sequence)) if c == '-'],
                     "hmm_db_path": hmm_db_path,
                     "hmm_acc": hit.accession.decode("utf-8"),
                     "hmm_name": hit.name.decode("utf-8"),
@@ -66,23 +66,23 @@ class hmmscanDF(AxlDF):
         return results
 
     @classmethod
-    def scanCDS(cls, cds_df: cdsDF, hmm_db_path: str, num_cpus: int=1, T: float=None, E: float=10.0, use_cutoff: str=None):
+    def scanCDS(cls, cds_df: cdsDF, hmm_db_path: str, num_cpus: int=1, bit_cutoff: float=None, e_cutoff: float=10.0, phmm_cutoff: str=None):
         
-        if use_cutoff:
-            if use_cutoff not in ["NC", "GC" or "TC"]:
+        if phmm_cutoff:
+            if phmm_cutoff not in ["NC", "GC" or "TC"]:
                 raise Exception("use an appropriate pHMM cutoff ('NC', 'GC', or 'TC')")
-            use_cutoff = {
+            phmm_cutoff = {
                 "GC": "gathering", "TC": "trusted", "NC": "noise"
-            }[use_cutoff]
+            }[phmm_cutoff]
         
         return cls(
-            cds_df.df.select(["row_id", "aa_sequence"]).rdd.flatMap(
+            cds_df.df.select(F.col("row_id").cast(T.StringType()).alias("name"), "aa_sequence").rdd.flatMap(
                 lambda row: cls.run_pyhmmscan(
                     [row], hmm_db_path,
                     num_cpus=num_cpus,
-                    T=T,
-                    E=E,
-                    use_cutoff=use_cutoff
+                    T=bit_cutoff,
+                    E=e_cutoff,
+                    use_cutoff=phmm_cutoff
                 )
             ).toDF(cls.getSchema())
         )
