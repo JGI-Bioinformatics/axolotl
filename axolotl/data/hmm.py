@@ -39,8 +39,19 @@ class hmmscanDF(AxlDF):
         return True
 
     @classmethod
-    def run_pyhmmscan(cls, rows: List[Row], hmm_db_path: str, num_cpus: int=1, T: float=None, E: float=10.0, use_cutoff: str=None):
-        hmm_file = HMMFile(hmm_db_path).optimized_profiles()
+    def run_pyhmmscan(
+        cls, rows: List[Row], hmm_db_path: str, num_cpus: int=1,
+        T: float=None, E: float=10.0, use_cutoff: str=None,
+        use_unoptimized_hmm: bool=False
+    ):
+        hmm_file = HMMFile(hmm_db_path)
+        try:
+            hmm_file = hmm_file.optimized_profiles()
+        except:
+            if use_unoptimized_hmm:
+                warnings.warn("trying to use an unoptimized HMM profile ({})!!".format(hmm_db_path))
+            else:
+                raise Exception("trying to use an unoptimized HMM profile ({})!! Set 'use_unoptimized_hmm'=True to ignore this error.".format(hmm_db_path))
         sequences_pyhmmer = (
             TextSequence(
                 name=bytes(row["name"], "utf-8"),
@@ -56,8 +67,8 @@ class hmmscanDF(AxlDF):
                     "query_to": hit.best_domain.alignment.target_to,
                     "query_gaps": [i+1 for i, c in enumerate(str(hit.best_domain.alignment.target_sequence)) if c == '-'],
                     "hmm_db_path": hmm_db_path,
-                    "hmm_acc": hit.accession.decode("utf-8"),
-                    "hmm_name": hit.name.decode("utf-8"),
+                    "hmm_acc": (hit.accession or bytes("", "utf-8")).decode("utf-8"),
+                    "hmm_name": (hit.name or bytes("", "utf-8")).decode("utf-8"),
                     "hmm_from": hit.best_domain.alignment.hmm_from,
                     "hmm_to": hit.best_domain.alignment.hmm_to,
                     "hmm_gaps":  [i+1 for i, c in enumerate(str(hit.best_domain.alignment.hmm_sequence)) if c == '.'],
