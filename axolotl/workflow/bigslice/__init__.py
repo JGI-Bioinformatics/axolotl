@@ -1,6 +1,6 @@
 from abc import abstractmethod
 from axolotl.core import AxlDF
-from axolotl.workflow import AxlWorkFlow
+from axolotl.workflow.base import AxlWorkFlow
 from axolotl.data.seq import NuclSeqDF
 from axolotl.data.feature import FeatDF
 from axolotl.data.bgc import bgcDF
