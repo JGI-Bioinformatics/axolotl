@@ -120,7 +120,7 @@ def make_dirs(file_path):
         try:
             from pyspark.dbutils import DBUtils
             dbutils = DBUtils(spark)
-            return dbutils.fs.mkdirs("user/satria/test")
+            return dbutils.fs.mkdirs(file_path)
         except ImportError:
             raise Exception("can't access DataBricks DBUtils")
     else:
