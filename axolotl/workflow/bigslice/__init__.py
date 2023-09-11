@@ -10,7 +10,7 @@ import pyspark.sql.types as T
 from pyspark.sql import Row
 from typing import Dict
 
-from axolotl.workflow.bigslice.cdsbgc import cdsBGCDF
+from axolotl.workflow.bigslice.cdsbgc import cdsbgcDF
 
 
 class BigsliceWorkFlow(AxlWorkFlow):
@@ -21,7 +21,7 @@ class BigsliceWorkFlow(AxlWorkFlow):
         return {
             "bgc": bgcDF,
             "cds": cdsDF,
-            "cds_to_bgc": cdsBGCDF
+            "cds_to_bgc": cdsbgcDF
         }
         
     @abstractmethod
@@ -37,7 +37,7 @@ class BigsliceWorkFlow(AxlWorkFlow):
 
         bgc = self._getData("bgc")
         cds = self._getData("cds")
-        self._setData("cds_to_bgc", cdsBGCDF(bgc.df.join(cds.df, [
+        self._setData("cds_to_bgc", cdsbgcDF(bgc.df.join(cds.df, [
             bgc.df.file_path == cds.df.file_path,
             bgc.df.source_path == cds.df.source_path,
             bgc.df.seq_id == cds.df.seq_id,
