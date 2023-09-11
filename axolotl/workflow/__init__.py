@@ -6,7 +6,7 @@ import json
 from os import path
 
 ### load all subclasses here
-
+from axolotl.workflow.bigslice import BigsliceWorkFlow
 ###
 
 
