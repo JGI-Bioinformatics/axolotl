@@ -1,6 +1,6 @@
 # axolotl utils
 from pyspark.sql import SparkSession
-from os import path, makedirs, rmdir
+from os import path, makedirs
 import re
 import shutil
 import gzip
@@ -177,7 +177,9 @@ def get_temp_dir(suffix=None, prefix=None, dir=None):
     class AxlTempDir:
         dir_path = None
         in_databricks = None
+        custom_dir = None
         def __init__(self, in_databricks, suffix=None, prefix=None, dir=None):
+            self.custom_dir = (dir is not None)
             if not in_databricks:
                 self.dir_path = mkdtemp(suffix=suffix, prefix=prefix, dir=dir)
                 self.in_databricks = False
@@ -208,9 +210,10 @@ def get_temp_dir(suffix=None, prefix=None, dir=None):
         def __enter__(self):
             return self.dir_path
         def __exit__(self, exc_type, exc_value, traceback):
-            if not self.in_databricks:
-                rmdir(self.dir_path)
-            else:
-                dbutils.fs.rm(self.dir_path, True)
+            if not self.custom_dir:
+                if not self.in_databricks:
+                    shutil.rmtree(self.dir_path)
+                else:
+                    dbutils.fs.rm(self.dir_path, True)
 
     return AxlTempDir(in_databricks, suffix=suffix, prefix=prefix, dir=dir)
