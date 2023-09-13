@@ -1,44 +1,47 @@
-"""axolotl.core
-
-Contain core classes and functions
-"""
-
-from pyspark.sql import SparkSession
-
-from axolotl.utils.file import check_file_exists, is_directory, parse_path_type, get_temp_dir
-
 from abc import ABC, abstractmethod
 from os import path
 from typing import List, Dict, Tuple
 
+from pyspark.sql import DataFrame, Row
+from pyspark.sql import functions as F
+from pyspark.sql import types as T
+
+from axolotl.utils.file import check_file_exists, is_directory, parse_path_type, get_temp_dir
+from axolotl.utils.spark import get_spark_session_and_context
+
+from axolotl.data import ioDF
+
 
 class AxlIO(ABC):
-    """Axolotl basic Input/Output (mostly input) class"""
+    """
+    
+    """
     
     @classmethod
-    def loadSmallFiles(cls, file_pattern:str, minPartitions:int=200, params:Dict={}) -> ioDF:
+    def loadSmallFiles(cls, file_pattern: str, params: Dict={}) -> ioDF:
+        """
+
+        """
+
         spark, sc = get_spark_session_and_context()
-        spark = SparkSession.getActiveSession()
-        if spark == None:
-            raise Exception("can't find any Spark active session!")
-        sc = spark.sparkContext
         
         # input check
         if not isinstance(file_pattern, str):
             raise TypeError("expected file_pattern to be a string")
             
         return cls.__postprocess(cls._getOutputDFclass()(
-            sc.wholeTextFiles(file_pattern, minPartitions=minPartitions)\
-            .flatMap(lambda x: cls._parseFile(x[0], x[1], params))\
-            .toDF(schema=cls._getOutputDFclass().getSchema())
-        ), params=params)
+            sc.wholeTextFiles(file_pattern)\
+                .flatMap(lambda x: cls._parseFile(x[0], x[1], params))\
+                .toDF(schema = cls._getOutputDFclass()._getSchema())
+        ), params = params)
 
     @classmethod
-    def loadConcatenatedFiles(cls, file_pattern:str, minPartitions:int=200, persist:bool=True, intermediate_pq_path:str="", params:Dict={}) -> ioDF:
-        spark = SparkSession.getActiveSession()
-        if spark == None:
-            raise Exception("can't find any Spark active session!")
-        sc = spark.sparkContext
+    def loadConcatenatedFiles(cls, file_pattern: str, persist: bool=True, intermediate_pq_path: str="", params:Dict={}) -> ioDF:
+        """
+        
+        """
+
+        spark, sc = get_spark_session_and_context()
         
         # input check
         if not isinstance(file_pattern, str):
@@ -60,12 +63,12 @@ class AxlIO(ABC):
         sc._jsc.hadoopConfiguration().set("textinputformat.record.delimiter", cls._getFileDelimiter()[0])
 
         # parse dataframe and evaluate
-        df = sc.textFile(file_pattern, minPartitions=minPartitions)\
-        .map(lambda x: x[:-1])\
-        .filter(lambda x: x != "")\
-        .map(lambda x: tuple(x.split(cls._getFileDelimiter()[1], 1)))\
-        .flatMap(lambda x: cls._parseFile(x[0], x[1], params))\
-        .toDF(schema=cls._getOutputDFclass().getSchema())
+        df = sc.textFile(file_pattern)\
+            .map(lambda x: x[:-1])\
+            .filter(lambda x: x != "")\
+            .map(lambda x: tuple(x.split(cls._getFileDelimiter()[1], 1)))\
+            .flatMap(lambda x: cls._parseFile(x[0], x[1], params))\
+            .toDF(schema = cls._getOutputDFclass()._getSchema())
         
         if persist:
             df.persist()
@@ -86,11 +89,12 @@ class AxlIO(ABC):
         return cls.__postprocess(cls._getOutputDFclass()(df), params=params)
         
     @classmethod
-    def loadBigFiles(cls, file_paths:List[str], intermediate_pq_path:str, minPartitions:int=200, params:Dict={}) -> ioDF:
-        spark = SparkSession.getActiveSession()
-        if spark == None:
-            raise Exception("can't find any Spark active session!")
-        sc = spark.sparkContext
+    def loadBigFiles(cls, file_paths:List[str], intermediate_pq_path:str, params:Dict={}) -> ioDF:
+        """
+        
+        """
+
+        spark, sc = get_spark_session_and_context()
         
         # input check
         if not isinstance(intermediate_pq_path, str):
@@ -143,15 +147,14 @@ class AxlIO(ABC):
                     sc._jsc.hadoopConfiguration().set("textinputformat.record.delimiter", cls._getRecordDelimiter())
                     # parse
                     _df = spark.createDataFrame(
-                        sc.textFile(text_file_path, minPartitions=minPartitions).filter(lambda x: x != "").map(
+                        sc.textFile(text_file_path).filter(lambda x: x != "").map(
                             lambda y: cls._parseRecord(y, params)
                         ).flatMap(lambda n: n).filter(lambda z: (z != None) if params.get("skip_malformed_record", False) else True),
                         schema=cls._getOutputDFclass()._getSchemaSpecific()
                     )
                     _orig_cols = _df.columns
                     _df.withColumn("file_path", when(lit(True), lit(parse_path_type(file_path)["path"])))\
-                        .withColumn("row_id", when(lit(True), lit(0).cast("long")))\
-                        .select(["file_path", "row_id"] + _orig_cols)\
+                        .select(["file_path"] + _orig_cols)\
                     .write.mode('append').parquet(intermediate_pq_path)            
                     del _df
                     del _orig_cols
@@ -166,11 +169,12 @@ class AxlIO(ABC):
         return cls.__postprocess(cls._getOutputDFclass()(spark.read.parquet(intermediate_pq_path)), params=params)
 
     @classmethod
-    def concatSmallFiles(cls, file_pattern:str, path_output:str, num_partitions:int=-1):
-        spark = SparkSession.getActiveSession()
-        if spark == None:
-            raise Exception("can't find any Spark active session!")
-        sc = spark.sparkContext
+    def concatSmallFiles(cls, file_pattern: str, path_output: str, num_partitions: int=-1):
+        """
+        
+        """
+
+        spark, sc = get_spark_session_and_context()
         
         # make sure the outputh path is empty
         if check_file_exists(path_output):
@@ -179,7 +183,7 @@ class AxlIO(ABC):
             raise TypeError("expected file_pattern to be a string")
         
         # import RDD
-        rdd_imported = sc.wholeTextFiles(file_pattern, minPartitions=num_partitions)\
+        rdd_imported = sc.wholeTextFiles(file_pattern)\
         .reduceByKey(lambda row1, row2: row1)\
         .map(lambda x: cls._getFileDelimiter()[0] + x[0] + cls._getFileDelimiter()[1] + x[1])\
         
@@ -187,37 +191,23 @@ class AxlIO(ABC):
             rdd_imported = rdd_imported.repartition(num_partitions)            
         
         rdd_imported.saveAsTextFile(path_output)
-    
+
     @classmethod
     def _getFileDelimiter(cls) -> Tuple[str, str]:
+        """
+        
+        """
+
         return ("\n>>>>>file_path:", "\n")
     
     @classmethod
-    @abstractmethod
-    def _getRecordDelimiter(cls) -> str:
-        raise NotImplementedError("calling an unimplemented abstract method _getRecordDelimiter()")
-    
-    @classmethod
-    @abstractmethod
-    def _getOutputDFclass(cls) -> ioDF:
-        raise NotImplementedError("calling an unimplemented abstract method _getOutputDFclass()")
-    
-    @classmethod
-    def _prepInput(cls, file_path:str, tmp_dir:str) -> str:
-        # by default, not doing any processing, return the original filepath
-        return file_path
+    def _parseFile(cls, file_path: str, text: str, params: Dict={}) -> List[Row]:
+        """
+        
+        """
 
-    @classmethod
-    @abstractmethod
-    def _parseRecord(cls, text:str, params:Dict={}) -> Dict:
-        raise NotImplementedError("calling an unimplemented abstract method _parseRecord()")
-
-    @classmethod
-    def _parseFile(cls, file_path:str, text:str, params:Dict={}) -> List[Row]:
         result = []
-        for i, record_text in enumerate(
-            text.split(cls._getRecordDelimiter())
-        ):
+        for record_text in text.split(cls._getRecordDelimiter()):
             if record_text == "":
                 continue
             parsed_array = cls._parseRecord(record_text, params)
@@ -225,28 +215,71 @@ class AxlIO(ABC):
                 if parsed == None and params.get("skip_malformed_record", False):
                     continue
                 if isinstance(parsed, list):
-                    result.append([parse_path_type(file_path)["path"], i] + parsed)
+                    result.append([parse_path_type(file_path)["path"]] + parsed)
                 elif isinstance(parsed, dict):
                     result.append({ # the ** is to concatenate the two dictionaries
                         **{
-                            "file_path": file_path,
-                            "row_id": i
+                            "file_path": file_path
                         },
                         **parsed
                     })
                 else:
                     raise NotImplementedError("_parseFile needs to return either lists of list or lists of dict")
-                
-                i += 1 # TODO: this implementation will NOT produce uniqe IDs across partitions!!
         return result
-    
+
     @classmethod
     def __postprocess(cls, data:ioDF, params:Dict={}):
-        data.df = data.df.withColumn("row_id", when(lit(True), monotonically_increasing_id()))
+        """
+        
+        """
+
         data = cls._postprocess(data, params)
         return data
+
+    ##### TO BE IMPLEMENTED BY SUBCLASSES #####
+
+    @classmethod
+    @abstractmethod
+    def _getRecordDelimiter(cls) -> str:
+        """
+        
+        """
+        
+        raise NotImplementedError("calling an unimplemented abstract method _getRecordDelimiter()")
     
     @classmethod
-    def _postprocess(cls, data:ioDF, params:Dict={}) -> Dict:
-        return data
+    @abstractmethod
+    def _getOutputDFclass(cls) -> ioDF:
+        """
+        
+        """
+        
+        raise NotImplementedError("calling an unimplemented abstract method _getOutputDFclass()")
 
+    @classmethod
+    @abstractmethod
+    def _parseRecord(cls, text: str, params:Dict={}) -> Dict:
+        """
+        
+        """
+        
+        raise NotImplementedError("calling an unimplemented abstract method _parseRecord()")
+
+    ##### TO BE OPTIONALLY IMPLEMENTED BY SUBCLASSES #####
+    
+    @classmethod
+    def _prepInput(cls, file_path: str, tmp_dir: str) -> str:
+        """
+        
+        """
+        
+        # by default, not doing any processing, return the original filepath
+        return file_path
+
+    @classmethod
+    def _postprocess(cls, data: ioDF, params: Dict={}) -> ioDF:
+        """
+        
+        """
+        
+        return data
