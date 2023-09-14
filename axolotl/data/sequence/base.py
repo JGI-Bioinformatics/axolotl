@@ -16,11 +16,11 @@ class SeqDF(ioDF):
 
     Example DataFrame content (apply for all subclasses):
 
+    -------------------------------------------------------------------------------------------------------------    
+     idx | file_path | seq_id   | desc       | sequence        | length    | ..<subclass-specific columns>...  |
     -------------------------------------------------------------------------------------------------------------
-    | idx | file_path | seq_id   | desc       | sequence        | length    | ..<subclass-specific columns>...  |
-    -------------------------------------------------------------------------------------------------------------
-    | 1   | /test.fa  | ctg_001  | contig_1   | ATGCATGCATGC... | 120       | ...                               |
-    | 2   | /test.fa  | ctg_002  | contig_2   | ATGCATGCATGC... | 120       | ...                               |
+     1   | /test.fa  | ctg_001  | contig_1   | ATGCATGCATGC... | 120       | ...                               |
+     2   | /test.fa  | ctg_002  | contig_2   | ATGCATGCATGC... | 120       | ...                               |    
     -------------------------------------------------------------------------------------------------------------
     """
     
