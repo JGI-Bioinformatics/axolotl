@@ -36,7 +36,31 @@ class AxlIO(ABC):
         ), params = params)
 
     @classmethod
-    def loadConcatenatedFiles(cls, file_pattern: str, persist: bool=True, intermediate_pq_path: str="", params:Dict={}) -> ioDF:
+    def concatSmallFiles(cls, file_pattern: str, path_output: str, num_partitions: int=-1):
+        """
+        
+        """
+
+        spark, sc = get_spark_session_and_context()
+        
+        # make sure the outputh path is empty
+        if check_file_exists(path_output):
+            raise Exception("path_output file path exists! {}".format(path_output))
+        if not isinstance(file_pattern, str):
+            raise TypeError("expected file_pattern to be a string")
+        
+        # import RDD
+        rdd_imported = sc.wholeTextFiles(file_pattern)\
+        .reduceByKey(lambda row1, row2: row1)\
+        .map(lambda x: cls._getFileDelimiter()[0] + x[0] + cls._getFileDelimiter()[1] + x[1])\
+        
+        if num_partitions > 0:
+            rdd_imported = rdd_imported.repartition(num_partitions)            
+        
+        rdd_imported.saveAsTextFile(path_output)
+
+    @classmethod
+    def loadConcatenatedFiles(cls, file_pattern: str, persist: bool=True, intermediate_pq_path: str="", params: Dict={}) -> ioDF:
         """
         
         """
@@ -69,16 +93,15 @@ class AxlIO(ABC):
             .map(lambda x: tuple(x.split(cls._getFileDelimiter()[1], 1)))\
             .flatMap(lambda x: cls._parseFile(x[0], x[1], params))\
             .toDF(schema = cls._getOutputDFclass()._getSchema())
-        
-        if persist:
-            df.persist()
-            if intermediate_pq_path == "":
-                df.count()
-            else:
-                df.write.parquet(intermediate_pq_path)
-        elif intermediate_pq_path != "":
+
+        if intermediate_pq_path != "":
             df.write.parquet(intermediate_pq_path)
             df = spark.read.parquet(intermediate_pq_path)
+        elif persist:
+            df.persist()
+            df.count()
+        else:
+            raise Exception("either persist needs to be True or intermediate_pq_path needs to be supplied")
 
         # revert delimiter back to what it was before
         if delim_default != None:
@@ -86,10 +109,10 @@ class AxlIO(ABC):
         else:
             sc._jsc.hadoopConfiguration().unset("textinputformat.record.delimiter")
             
-        return cls.__postprocess(cls._getOutputDFclass()(df), params=params)
+        return cls.__postprocess(cls._getOutputDFclass()(df), params = params)
         
     @classmethod
-    def loadBigFiles(cls, file_paths:List[str], intermediate_pq_path:str, params:Dict={}) -> ioDF:
+    def loadBigFiles(cls, file_paths: List[str], intermediate_pq_path: str, params: Dict={}) -> ioDF:
         """
         
         """
@@ -138,7 +161,7 @@ class AxlIO(ABC):
                         use_dbfs = True
 
                     # run preprocessing if necessary
-                    text_file_path = cls._prepInput(file_path, tmp_dir)
+                    text_file_path = cls._prepInput(file_path, tmp_dir, params = params)
                     if use_dbfs:
                         text_file_path = text_file_path.replace("/dbfs/", "dbfs:/", 1)
                     
@@ -150,10 +173,10 @@ class AxlIO(ABC):
                         sc.textFile(text_file_path).filter(lambda x: x != "").map(
                             lambda y: cls._parseRecord(y, params)
                         ).flatMap(lambda n: n).filter(lambda z: (z != None) if params.get("skip_malformed_record", False) else True),
-                        schema=cls._getOutputDFclass()._getSchemaSpecific()
+                        schema = cls._getOutputDFclass()._getSchemaSpecific()
                     )
                     _orig_cols = _df.columns
-                    _df.withColumn("file_path", when(lit(True), lit(parse_path_type(file_path)["path"])))\
+                    _df.withColumn("file_path", F.when(F.lit(True), F.lit(parse_path_type(file_path)["path"])))\
                         .select(["file_path"] + _orig_cols)\
                     .write.mode('append').parquet(intermediate_pq_path)            
                     del _df
@@ -166,31 +189,7 @@ class AxlIO(ABC):
                         sc._jsc.hadoopConfiguration().unset("textinputformat.record.delimiter")
             
         # load DF from the intermediate parquet path, then output AxlDF
-        return cls.__postprocess(cls._getOutputDFclass()(spark.read.parquet(intermediate_pq_path)), params=params)
-
-    @classmethod
-    def concatSmallFiles(cls, file_pattern: str, path_output: str, num_partitions: int=-1):
-        """
-        
-        """
-
-        spark, sc = get_spark_session_and_context()
-        
-        # make sure the outputh path is empty
-        if check_file_exists(path_output):
-            raise Exception("path_output file path exists! {}".format(path_output))
-        if not isinstance(file_pattern, str):
-            raise TypeError("expected file_pattern to be a string")
-        
-        # import RDD
-        rdd_imported = sc.wholeTextFiles(file_pattern)\
-        .reduceByKey(lambda row1, row2: row1)\
-        .map(lambda x: cls._getFileDelimiter()[0] + x[0] + cls._getFileDelimiter()[1] + x[1])\
-        
-        if num_partitions > 0:
-            rdd_imported = rdd_imported.repartition(num_partitions)            
-        
-        rdd_imported.saveAsTextFile(path_output)
+        return cls.__postprocess(cls._getOutputDFclass()(spark.read.parquet(intermediate_pq_path)), params = params)
 
     @classmethod
     def _getFileDelimiter(cls) -> Tuple[str, str]:
@@ -268,7 +267,7 @@ class AxlIO(ABC):
     ##### TO BE OPTIONALLY IMPLEMENTED BY SUBCLASSES #####
     
     @classmethod
-    def _prepInput(cls, file_path: str, tmp_dir: str) -> str:
+    def _prepInput(cls, file_path: str, tmp_dir: str, params: Dict={}) -> str:
         """
         
         """

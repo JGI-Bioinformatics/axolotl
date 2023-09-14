@@ -62,6 +62,28 @@ def test_axl_io(spark):
             ]))
 
         print(">>> Testing loadSmallFiles() <<<")
-        parsed_meta_df = DummyIO.loadSmallFiles(path.join(tmp_dir, "*.txt"))
-        print(parsed_meta_df.df.collect())
-        assert False
+        parsed_meta_df = DummyIO.loadSmallFiles(
+            path.join(tmp_dir, "*.txt"),
+            params = { "prefix": "params-checked-" }
+        )
+        assert parsed_meta_df.df.filter("key like 'params-checked-%'").count() == 8
+
+        print(">>> Testing loadBigFiles() <<<")
+        parsed_meta_df = DummyIO.loadBigFiles(
+            [path.join(tmp_dir, "dummy_file_1.txt"), path.join(tmp_dir, "dummy_file_1.txt")],
+            intermediate_pq_path = path.join(tmp_dir, "intermediate_pq_path"),
+            params = { "prefix": "params-checked-" }
+        )
+        assert parsed_meta_df.df.filter("key like 'params-checked-preprocessed-params-checked-%'").count() == 8
+
+        print(">>> Testing concatSmallFiles() and loadConcatenatedFiles() <<<")
+        DummyIO.concatSmallFiles(
+            path.join(tmp_dir, "*.txt"),
+            path.join(tmp_dir, "concatenated_files.txt")
+        )
+        parsed_meta_df = DummyIO.loadConcatenatedFiles(
+            path.join(tmp_dir, "concatenated_files.txt"),
+            params = { "prefix": "params-checked-" }
+        )
+        assert parsed_meta_df.df.filter("key like 'params-checked-%'").count() == 8
+
