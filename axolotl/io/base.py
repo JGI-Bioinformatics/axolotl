@@ -14,13 +14,71 @@ from axolotl.data import ioDF
 
 class AxlIO(ABC):
     """
-    
+    Base Axolotl class for handling the parallel parsing of raw input files commonly used
+    in omics analyses (e.g., FASTA/Q, GenBank, GFF3, VCF, SAM, etc.). All AxlIO modules will
+    take a specific raw input format, then outputs an ioDF (AxlDF with a 'file_path' column)
+    object representing the information contained in the raw input now encoded in a tabular
+    format (i.e., DataFrame) for further processing.
+
+    The recommended way to use any AxlIO function is to directly store its ioDF output, then
+    later on (or subsequently) instantiate the same ioDF class from the stored parquet output.
+    See this example:
+
+        from axolotl.io import NuclFastaIO
+        from axolotl.data import NuclSeqDF
+
+        # parse input fasta files and store the resulting AxlDF object
+        NuclFastaIO.loadSmallFiles("/home/all_genome_fastas/*.fa").write("/home/all_genome_fastas_axldf")
+
+        # load previously-processed input files
+        sequences_df = NuclSeqDF.read("/home/all_genome_fastas_axldf")
+
+        # show dataframe
+        sequences_df.df.show()
+
+    For all AxlIO sub-classes, there are three ways to load input files, depending on the nature
+    of the files itself:
+
+    1) AxlIO.loadSmallFiles() --> use this when dealing with many small files as input (e.g., 100,000 bacterial
+       genome files). This mode will use Spark's native "wholeTextFiles" to resolve the input files pattern
+       (use '*' for wildcard) and _immediately_ distribute the partition based on a specific record separator.
+       In this case, all file contents will be treated like it was coming from a giant concatenated file.
+       One limitation of this mode is that it will only support textual file inputs (no zip files!) and that it
+       doesn't allow pre-processing, therefore users should perform any pre-processing themselves before using
+       Axolotl.
+
+    2) AxlIO.loadBigFiles() --> use this when dealing with multiple big files (e.g., >1GB VCF files) or when you
+       need to apply some pre-processing before the files can be read by Spark (e.g., zipped FASTQ files). Different
+       from mode #1, Axolotl will take a list of every filepaths and work on each big file in series, i.e.,:
+          -> input = [file_path#1, file_path#2, file_path#3]
+          -> read file_path#1 -> perform preprocessing on file_path#1 -> parse file_path#1 using Spark -> store intermediate pq
+          -> read file_path#2 -> perform preprocessing on file_path#2 -> parse file_path#2 using Spark -> store intermediate pq
+          -> read file_path#3 -> perform preprocessing on file_path#3 -> parse file_path#3 using Spark -> store intermediate pq
+          -> concat all intermediate_pq files and store as a final ioDF parquet
+       do note, however, that since all pre-processing will happen on the driver node, you need to make sure that the
+       driver node is powerful enough to handle the operation successfully.
+
+    3) AxlIO.loadConcatenatedFiles() --> work in concordance with AxlIO.concatSmallFiles(), this mode was meant
+       for users working with many small files (as with mode #1) but are using distributed data storage such as
+       Hadoop FileSystem (HDFS). Since storing many small files will introduce a lot overhead in such storage
+       system, users can use this mode to pre-process and pack the files into chunks of bigger files that are
+       more appropriately-sized for HDFS. Axolotl will seamlessly tracks all original filenames of the small files
+       and correctly incorporate them into the resulting ioDF object.
+
+    -----------------
+
+    Subclassing an AxlIO class: implements all methods under "##### TO BE IMPLEMENTED BY SUBCLASSES #####". You can also
+    see an example in the axolotl.io.dummyio module.
+
     """
     
     @classmethod
     def loadSmallFiles(cls, file_pattern: str, params: Dict={}) -> ioDF:
         """
-
+        take an input file pattern (in "glob"-style) and parse every identifiable files into
+        an ioDF object. Always make sure that the input files are texts (i.e., unzipped) since
+        this method will only be able to read text files.
+        Use params to pass any subclass-specific parameters into your parsing.
         """
 
         spark, sc = get_spark_session_and_context()
@@ -38,7 +96,9 @@ class AxlIO(ABC):
     @classmethod
     def concatSmallFiles(cls, file_pattern: str, path_output: str, num_partitions: int=-1):
         """
-        
+        take an input file pattern (in "glob"-style) and concatenate them into chunks of
+        bigger files (defined by 'num_partitions') to allow efficient storage in distributed
+        system such as HDFS.
         """
 
         spark, sc = get_spark_session_and_context()
@@ -62,7 +122,8 @@ class AxlIO(ABC):
     @classmethod
     def loadConcatenatedFiles(cls, file_pattern: str, persist: bool=True, intermediate_pq_path: str="", params: Dict={}) -> ioDF:
         """
-        
+        load the previously-concatenated small files (see concatSmallFiles()) and parse them
+        in parallel using Spark.
         """
 
         spark, sc = get_spark_session_and_context()
@@ -114,7 +175,10 @@ class AxlIO(ABC):
     @classmethod
     def loadBigFiles(cls, file_paths: List[str], intermediate_pq_path: str, params: Dict={}) -> ioDF:
         """
-        
+        take a list of filepaths representing "big" files, iterate through all the files and parse each
+        using Spark in a subsequent manner. This method allows the use of _prepInput() for pre-processing
+        the files before parsing. "intermediate_pq_path" will always be needed for this method for storing
+        the intermedate parquet results of each file before later on combining them into one giant dataframe.
         """
 
         spark, sc = get_spark_session_and_context()
@@ -194,7 +258,8 @@ class AxlIO(ABC):
     @classmethod
     def _getFileDelimiter(cls) -> Tuple[str, str]:
         """
-        
+        this method is used by the concatSmallFiles() and loadConcatenatedFiles() to keep track of the original
+        small file's names. Generally, you don't need to override or modify this method.
         """
 
         return ("\n>>>>>file_path:", "\n")
@@ -202,7 +267,9 @@ class AxlIO(ABC):
     @classmethod
     def _parseFile(cls, file_path: str, text: str, params: Dict={}) -> List[Row]:
         """
-        
+        this method is used by loadSmallFiles() and loadConcatenatedFiles() to break text files parsed by Spark
+        into list of records based on the subclass-specific delimiters (defined via _getRecordDelimiter()). Do not
+        override this method unless you know what you are doing.
         """
 
         result = []
@@ -227,9 +294,10 @@ class AxlIO(ABC):
         return result
 
     @classmethod
-    def __postprocess(cls, data:ioDF, params:Dict={}):
+    def __postprocess(cls, data: ioDF, params:Dict={}):
         """
-        
+        this method injects an AxlIO-wide general postprocessing step before calling subclass-specific
+        postprocess (via _postprocess()) that works on the ioDF object of the parsed results.
         """
 
         data = cls._postprocess(data, params)
@@ -241,7 +309,9 @@ class AxlIO(ABC):
     @abstractmethod
     def _getRecordDelimiter(cls) -> str:
         """
-        
+        mandatory override: specify the set of characters (i.e., a string) that serves as a "row-delimiter"
+        in your input files, make sure to also include the newline in the delimiter. For example, in FASTA,
+        you can use "\\n>" as the delimiter. See examples in the existing axolotl.io modules.
         """
         
         raise NotImplementedError("calling an unimplemented abstract method _getRecordDelimiter()")
@@ -250,16 +320,29 @@ class AxlIO(ABC):
     @abstractmethod
     def _getOutputDFclass(cls) -> ioDF:
         """
-        
+        mandatory override: specify the type of ioDF object that will come out of this AxlIO module. Example:
+
+        from axolotl.data import NuclSeqDF
+
+        @classmethod
+        @abstractmethod
+        def _getOutputDFclass(cls) -> NuclSeqDF:
+            return NuclSeqDF
+
         """
         
         raise NotImplementedError("calling an unimplemented abstract method _getOutputDFclass()")
 
     @classmethod
     @abstractmethod
-    def _parseRecord(cls, text: str, params:Dict={}) -> Dict:
+    def _parseRecord(cls, record_text: str, params: Dict={}) -> Dict:
         """
-        
+        mandatory override: the main logic of your AxlIO parser. Will receive the string representation
+        of your record after being split using the record delimiter. Parse that string and return a
+        list of dictionaries (one record can resulted in multiple dataframe rows, for example parsing the
+        sequence features in a GenBank file), the key representing the column name of the target ioDF
+        class. Remember to use appropriate value data types according to the schema (e.g., a LongType()
+        column will only accept integer-type inputs).
         """
         
         raise NotImplementedError("calling an unimplemented abstract method _parseRecord()")
@@ -269,7 +352,22 @@ class AxlIO(ABC):
     @classmethod
     def _prepInput(cls, file_path: str, tmp_dir: str, params: Dict={}) -> str:
         """
-        
+        override this method if you want to provide a pre-processing step into your loadBigFiles()
+        method. This function gives you the original file path as an input, and a temporary directory
+        path that you can optionally store your pre-processed file into. You will then output the
+        file path of that pre-processed file, which will then be read directly by Spark.
+
+        Example: unzipping a fastq.gz file before parsing (assuming gunzip is installed in driver node)
+
+        import subprocess
+
+        classmethod
+        def _prepInput(cls, file_path: str, tmp_dir: str, params: Dict={}) -> str:
+            if file_path.endswith(".gz"):
+                temp_file = path.join(tmp_dir, "uncompressed.fastq")
+                subprocess.run("gunzip " + file_path + " " + temp_file, shell=True)
+                return temp_file
+
         """
         
         # by default, not doing any processing, return the original filepath
@@ -278,7 +376,8 @@ class AxlIO(ABC):
     @classmethod
     def _postprocess(cls, data: ioDF, params: Dict={}) -> ioDF:
         """
-        
+        override this method if you want to append additional dataframe-wide operations on the resulting ioDF
+        object. Returns the resulting modified ioDF object.
         """
         
         return data
