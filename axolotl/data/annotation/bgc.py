@@ -11,6 +11,38 @@ from typing import Dict, List
 
 
 class bgcDF(ioDF):
+    """
+    AxlDF subclass to represent BGC (biosynthetic gene cluster) features in a genome annotation data. BGCs are usually stored
+    in a GenBank-formatted file (or in some cases GFF3) and have their own set of BGC-specific qualifiers. Many tools provide
+    identification of BGCs from genomes, the most widely-used one being antiSMASH (https://antismash.secondarymetabolites.org/#!/start).
+
+    This AxlDF subclass aims to standardized the information of a BGC (e.g., what columns does it have). Typically a bgcDF table
+    will need to be accompanied by a cdsDF table, which holds the information of the actual genes included in each BGC, linked
+    by the overlaps between their locations.
+
+    Example DataFrame content:
+
+    --------------------------------------------------------------------------------------------------------------------------
+    | idx | file_path  | source_path | seq_id   | location                            | classes         | nt_seq  
+    --------------------------------------------------------------------------------------------------------------------------
+    | 1   | /test.gff  | /test.fa    | contig_1 | {"start": 1, "end": 30000, ...}     | ["NRPS"]        | ATGCATGCATGC...
+    | 2   | /test.gff  | /test.fa    | contig_1 | {"start": 45600, "end": 72300, ...} | ["PKS", "NRPS"] | GCATATGCATGC...
+    --------------------------------------------------------------------------------------------------------------------------
+    -------------------------------------------------------------------
+     on_contig_edge  | other_qualifiers
+    -------------------------------------------------------------------
+     True            | [{"cluster-number": "1"}]
+     False           | [{"cluster-number": "2"}]
+    -------------------------------------------------------------------
+
+    - source_path: nucleotide sequence file corresponding to this BGC
+    - seq_id: nucleotide sequence id (e.g., contig id) corresponding to this BGC
+    - location: { start, end, strand } location of this BGC in the sequence
+    - nt_seq: nucleotide sequence of this BGC (only available if you supply a NuclSeqDF alongside the RawFeatDF)
+    - on_contig_edge: whether the BGC sits in the boundary of a contig (i.e., a fragmented BGC)
+    - other_qualifiers: the rest of the qualifiers column after taking out the classes and contig_edge information
+    """
+
     
     @classmethod
     def _getSchemaSpecific(cls) -> T.StructType:
@@ -39,6 +71,15 @@ class bgcDF(ioDF):
 
     @classmethod
     def fromRawFeatDF(cls, features: RawFeatDF, sequences: NuclSeqDF=None, source_type: str="antismash", reindex: bool=True):
+        """
+        the primary class method to use for generating a bgcDF given a previously-parsed RawFeatDF. By default, it will parse
+        for antiSMASH-type BGCs (encoded as a "region" in the gbk file). Use source_type == "smc" if the BGC features come
+        from the SMC database's (https://smc.jgi.doe.gov/) GFF3 files. When a NuclSeqDF is also supplied, Axolotl will also
+        extract the nucleotide sequences information of each BGC, along with the "on_contig_edge" status (if it was not set
+        before, such as the case of SMC BGCs).
+
+        By default, the resulting bgcDF will have its own 'idx' recalculated (reindex=True).
+        """
         
         if source_type == "antismash":
             df = features.df.filter("type = 'region'")\
