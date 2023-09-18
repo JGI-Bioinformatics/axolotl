@@ -18,28 +18,28 @@ class DummyIO(AxlIO):
 
     @classmethod
     @abstractmethod
-    def _getOutputDFclass(cls) -> MetaDF:
+    def _getOutputDFclass(cls, prefix: str="") -> MetaDF:
         return MetaDF
 
     @classmethod
     @abstractmethod
-    def _parseRecord(cls, text: str, params: Dict={}) -> Dict:
+    def _parseRecord(cls, text: str, prefix: str="") -> Dict:
         key, value = text.rstrip("\n").split(",")
         return [{
-            "key": params["prefix"] + key,
+            "key": prefix + key,
             "value": value
         }]
 
     @classmethod
-    def _prepInput(cls, file_path: str, tmp_dir: str, params: Dict={}) -> str:
+    def _prepInput(cls, file_path: str, tmp_dir: str, prefix: str="") -> str:
         temp_file = path.join(tmp_dir, "temp.txt")
         with open(file_path, "r") as input_stream:
             with open(temp_file, "w") as output_stream:
                 for line in input_stream:
-                    output_stream.write("preprocessed-" + params["prefix"] + line)
+                    output_stream.write("preprocessed-" + prefix + line)
         return temp_file
 
     @classmethod
-    def _postprocess(cls, data: MetaDF, params: Dict={}) -> MetaDF:
+    def _postprocess(cls, data: MetaDF, prefix: str="") -> MetaDF:
         new_df = data.df.withColumn("value", F.when(F.lit(True), F.lit("postprocessed")))
-        return cls._getOutputDFclass()(new_df, keep_idx=True)
+        return cls._getOutputDFclass(prefix)(new_df, keep_idx=True)

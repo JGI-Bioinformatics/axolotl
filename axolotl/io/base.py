@@ -73,7 +73,7 @@ class AxlIO(ABC):
     """
     
     @classmethod
-    def loadSmallFiles(cls, file_pattern: str, params: Dict={}) -> ioDF:
+    def loadSmallFiles(cls, file_pattern: str, *args, **kwargs) -> ioDF:
         """
         take an input file pattern (in "glob"-style) and parse every identifiable files into
         an ioDF object. Always make sure that the input files are texts (i.e., unzipped) since
@@ -89,9 +89,9 @@ class AxlIO(ABC):
             
         return cls.__postprocess(cls._getOutputDFclass()(
             sc.wholeTextFiles(file_pattern)\
-                .flatMap(lambda x: cls._parseFile(x[0], x[1], params))\
+                .flatMap(lambda x: cls._parseFile(x[0], x[1], *args, **kwargs))\
                 .toDF(schema = cls._getOutputDFclass()._getSchema())
-        ), params = params)
+        ), *args, **kwargs)
 
     @classmethod
     def concatSmallFiles(cls, file_pattern: str, path_output: str, num_partitions: int=-1):
@@ -120,7 +120,7 @@ class AxlIO(ABC):
         rdd_imported.saveAsTextFile(path_output)
 
     @classmethod
-    def loadConcatenatedFiles(cls, file_pattern: str, persist: bool=True, intermediate_pq_path: str="", params: Dict={}) -> ioDF:
+    def loadConcatenatedFiles(cls, file_pattern: str, persist: bool=True, intermediate_pq_path: str="", *args, **kwargs) -> ioDF:
         """
         load the previously-concatenated small files (see concatSmallFiles()) and parse them
         in parallel using Spark.
@@ -152,7 +152,7 @@ class AxlIO(ABC):
             .map(lambda x: x[:-1])\
             .filter(lambda x: x != "")\
             .map(lambda x: tuple(x.split(cls._getFileDelimiter()[1], 1)))\
-            .flatMap(lambda x: cls._parseFile(x[0], x[1], params))\
+            .flatMap(lambda x: cls._parseFile(x[0], x[1], *args, **kwargs))\
             .toDF(schema = cls._getOutputDFclass()._getSchema())
 
         if intermediate_pq_path != "":
@@ -170,10 +170,10 @@ class AxlIO(ABC):
         else:
             sc._jsc.hadoopConfiguration().unset("textinputformat.record.delimiter")
             
-        return cls.__postprocess(cls._getOutputDFclass()(df), params = params)
+        return cls.__postprocess(cls._getOutputDFclass()(df), *args, **kwargs)
         
     @classmethod
-    def loadBigFiles(cls, file_paths: List[str], intermediate_pq_path: str, params: Dict={}) -> ioDF:
+    def loadBigFiles(cls, file_paths: List[str], intermediate_pq_path: str, skip_malformed_record: bool=False, *args, **kwargs) -> ioDF:
         """
         take a list of filepaths representing "big" files, iterate through all the files and parse each
         using Spark in a subsequent manner. This method allows the use of _prepInput() for pre-processing
@@ -225,7 +225,7 @@ class AxlIO(ABC):
                         use_dbfs = True
 
                     # run preprocessing if necessary
-                    text_file_path = cls._prepInput(file_path, tmp_dir, params = params)
+                    text_file_path = cls._prepInput(file_path, tmp_dir, *args, **kwargs)
                     if use_dbfs:
                         text_file_path = text_file_path.replace("/dbfs/", "dbfs:/", 1)
                     
@@ -235,8 +235,8 @@ class AxlIO(ABC):
                     # parse
                     _df = spark.createDataFrame(
                         sc.textFile(text_file_path).filter(lambda x: x != "").map(
-                            lambda y: cls._parseRecord(y, params)
-                        ).flatMap(lambda n: n).filter(lambda z: (z != None) if params.get("skip_malformed_record", False) else True),
+                            lambda y: cls._parseRecord(y, *args, **kwargs)
+                        ).flatMap(lambda n: n).filter(lambda z: (z != None) if skip_malformed_record else True),
                         schema = cls._getOutputDFclass()._getSchemaSpecific()
                     )
                     _orig_cols = _df.columns
@@ -253,7 +253,7 @@ class AxlIO(ABC):
                         sc._jsc.hadoopConfiguration().unset("textinputformat.record.delimiter")
             
         # load DF from the intermediate parquet path, then output AxlDF
-        return cls.__postprocess(cls._getOutputDFclass()(spark.read.parquet(intermediate_pq_path)), params = params)
+        return cls.__postprocess(cls._getOutputDFclass()(spark.read.parquet(intermediate_pq_path)), *args, **kwargs)
 
     @classmethod
     def _getFileDelimiter(cls) -> Tuple[str, str]:
@@ -265,7 +265,7 @@ class AxlIO(ABC):
         return ("\n>>>>>file_path:", "\n")
     
     @classmethod
-    def _parseFile(cls, file_path: str, text: str, params: Dict={}) -> List[Row]:
+    def _parseFile(cls, file_path: str, text: str, skip_malformed_record: bool=False, *args, **kwargs) -> List[Row]:
         """
         this method is used by loadSmallFiles() and loadConcatenatedFiles() to break text files parsed by Spark
         into list of records based on the subclass-specific delimiters (defined via _getRecordDelimiter()). Do not
@@ -276,9 +276,9 @@ class AxlIO(ABC):
         for record_text in text.split(cls._getRecordDelimiter()):
             if record_text == "":
                 continue
-            parsed_array = cls._parseRecord(record_text, params)
+            parsed_array = cls._parseRecord(record_text, *args, **kwargs)
             for parsed in parsed_array:
-                if parsed == None and params.get("skip_malformed_record", False):
+                if parsed == None and skip_malformed_record:
                     continue
                 if isinstance(parsed, list):
                     result.append([parse_path_type(file_path)["path"]] + parsed)
@@ -294,13 +294,13 @@ class AxlIO(ABC):
         return result
 
     @classmethod
-    def __postprocess(cls, data: ioDF, params:Dict={}):
+    def __postprocess(cls, data: ioDF, *args, **kwargs):
         """
         this method injects an AxlIO-wide general postprocessing step before calling subclass-specific
         postprocess (via _postprocess()) that works on the ioDF object of the parsed results.
         """
 
-        data = cls._postprocess(data, params)
+        data = cls._postprocess(data, *args, **kwargs)
         return data
 
     ##### TO BE IMPLEMENTED BY SUBCLASSES #####
@@ -335,7 +335,7 @@ class AxlIO(ABC):
 
     @classmethod
     @abstractmethod
-    def _parseRecord(cls, record_text: str, params: Dict={}) -> Dict:
+    def _parseRecord(cls, record_text: str, *args, **kwargs) -> Dict:
         """
         mandatory override: the main logic of your AxlIO parser. Will receive the string representation
         of your record after being split using the record delimiter. Parse that string and return a
@@ -350,7 +350,7 @@ class AxlIO(ABC):
     ##### TO BE OPTIONALLY IMPLEMENTED BY SUBCLASSES #####
     
     @classmethod
-    def _prepInput(cls, file_path: str, tmp_dir: str, params: Dict={}) -> str:
+    def _prepInput(cls, file_path: str, tmp_dir: str, *args, **kwargs) -> str:
         """
         override this method if you want to provide a pre-processing step into your loadBigFiles()
         method. This function gives you the original file path as an input, and a temporary directory
@@ -362,7 +362,7 @@ class AxlIO(ABC):
         import subprocess
 
         classmethod
-        def _prepInput(cls, file_path: str, tmp_dir: str, params: Dict={}) -> str:
+        def _prepInput(cls, file_path: str, tmp_dir: str) -> str:
             if file_path.endswith(".gz"):
                 temp_file = path.join(tmp_dir, "uncompressed.fastq")
                 subprocess.run("gunzip " + file_path + " " + temp_file, shell=True)
@@ -374,7 +374,7 @@ class AxlIO(ABC):
         return file_path
 
     @classmethod
-    def _postprocess(cls, data: ioDF, params: Dict={}) -> ioDF:
+    def _postprocess(cls, data: ioDF, *args, **kwargs) -> ioDF:
         """
         override this method if you want to append additional dataframe-wide operations on the resulting ioDF
         object. Returns the resulting modified ioDF object.
