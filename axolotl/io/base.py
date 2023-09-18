@@ -87,10 +87,10 @@ class AxlIO(ABC):
         if not isinstance(file_pattern, str):
             raise TypeError("expected file_pattern to be a string")
             
-        return cls.__postprocess(cls._getOutputDFclass()(
+        return cls.__postprocess(cls._getOutputDFclass(*args, **kwargs)(
             sc.wholeTextFiles(file_pattern)\
                 .flatMap(lambda x: cls._parseFile(x[0], x[1], *args, **kwargs))\
-                .toDF(schema = cls._getOutputDFclass()._getSchema())
+                .toDF(schema = cls._getOutputDFclass(*args, **kwargs)._getSchema())
         ), *args, **kwargs)
 
     @classmethod
@@ -153,7 +153,7 @@ class AxlIO(ABC):
             .filter(lambda x: x != "")\
             .map(lambda x: tuple(x.split(cls._getFileDelimiter()[1], 1)))\
             .flatMap(lambda x: cls._parseFile(x[0], x[1], *args, **kwargs))\
-            .toDF(schema = cls._getOutputDFclass()._getSchema())
+            .toDF(schema = cls._getOutputDFclass(*args, **kwargs)._getSchema())
 
         if intermediate_pq_path != "":
             df.write.parquet(intermediate_pq_path)
@@ -170,7 +170,7 @@ class AxlIO(ABC):
         else:
             sc._jsc.hadoopConfiguration().unset("textinputformat.record.delimiter")
             
-        return cls.__postprocess(cls._getOutputDFclass()(df), *args, **kwargs)
+        return cls.__postprocess(cls._getOutputDFclass(*args, **kwargs)(df), *args, **kwargs)
         
     @classmethod
     def loadBigFiles(cls, file_paths: List[str], intermediate_pq_path: str, skip_malformed_record: bool=False, *args, **kwargs) -> ioDF:
@@ -231,13 +231,13 @@ class AxlIO(ABC):
                     
                     # change delimiter for the custom textFiles() function
                     delim_default = sc._jsc.hadoopConfiguration().get("textinputformat.record.delimiter")
-                    sc._jsc.hadoopConfiguration().set("textinputformat.record.delimiter", cls._getRecordDelimiter())
+                    sc._jsc.hadoopConfiguration().set("textinputformat.record.delimiter", cls._getRecordDelimiter(*args, **kwargs))
                     # parse
                     _df = spark.createDataFrame(
                         sc.textFile(text_file_path).filter(lambda x: x != "").map(
                             lambda y: cls._parseRecord(y, *args, **kwargs)
                         ).flatMap(lambda n: n).filter(lambda z: (z != None) if skip_malformed_record else True),
-                        schema = cls._getOutputDFclass()._getSchemaSpecific()
+                        schema = cls._getOutputDFclass(*args, **kwargs)._getSchemaSpecific()
                     )
                     _orig_cols = _df.columns
                     _df.withColumn("file_path", F.when(F.lit(True), F.lit(parse_path_type(file_path)["path"])))\
@@ -253,7 +253,7 @@ class AxlIO(ABC):
                         sc._jsc.hadoopConfiguration().unset("textinputformat.record.delimiter")
             
         # load DF from the intermediate parquet path, then output AxlDF
-        return cls.__postprocess(cls._getOutputDFclass()(spark.read.parquet(intermediate_pq_path)), *args, **kwargs)
+        return cls.__postprocess(cls._getOutputDFclass(*args, **kwargs)(spark.read.parquet(intermediate_pq_path)), *args, **kwargs)
 
     @classmethod
     def _getFileDelimiter(cls) -> Tuple[str, str]:
@@ -268,12 +268,12 @@ class AxlIO(ABC):
     def _parseFile(cls, file_path: str, text: str, skip_malformed_record: bool=False, *args, **kwargs) -> List[Row]:
         """
         this method is used by loadSmallFiles() and loadConcatenatedFiles() to break text files parsed by Spark
-        into list of records based on the subclass-specific delimiters (defined via _getRecordDelimiter()). Do not
+        into list of records based on the subclass-specific delimiters (defined via _getRecordDelimiter(*args, **kwargs)). Do not
         override this method unless you know what you are doing.
         """
 
         result = []
-        for record_text in text.split(cls._getRecordDelimiter()):
+        for record_text in text.split(cls._getRecordDelimiter(*args, **kwargs)):
             if record_text == "":
                 continue
             parsed_array = cls._parseRecord(record_text, *args, **kwargs)
@@ -307,18 +307,20 @@ class AxlIO(ABC):
 
     @classmethod
     @abstractmethod
-    def _getRecordDelimiter(cls) -> str:
+    def _getRecordDelimiter(cls, *args, **kwargs) -> str:
         """
         mandatory override: specify the set of characters (i.e., a string) that serves as a "row-delimiter"
         in your input files, make sure to also include the newline in the delimiter. For example, in FASTA,
         you can use "\\n>" as the delimiter. See examples in the existing axolotl.io modules.
+
+        Use the same *args and **kwargs throughout all _getRecordDelimiter(), _getOutputDFclass() and _parseRecord()
         """
         
-        raise NotImplementedError("calling an unimplemented abstract method _getRecordDelimiter()")
+        raise NotImplementedError("calling an unimplemented abstract method _getRecordDelimiter(*args, **kwargs)")
     
     @classmethod
     @abstractmethod
-    def _getOutputDFclass(cls) -> ioDF:
+    def _getOutputDFclass(cls, *args, **kwargs) -> ioDF:
         """
         mandatory override: specify the type of ioDF object that will come out of this AxlIO module. Example:
 
@@ -329,9 +331,10 @@ class AxlIO(ABC):
         def _getOutputDFclass(cls) -> NuclSeqDF:
             return NuclSeqDF
 
+        Use the same *args and **kwargs throughout all _getRecordDelimiter(), _getOutputDFclass() and _parseRecord()
         """
         
-        raise NotImplementedError("calling an unimplemented abstract method _getOutputDFclass()")
+        raise NotImplementedError("calling an unimplemented abstract method _getOutputDFclass(*args, **kwargs)")
 
     @classmethod
     @abstractmethod
@@ -343,6 +346,8 @@ class AxlIO(ABC):
         sequence features in a GenBank file), the key representing the column name of the target ioDF
         class. Remember to use appropriate value data types according to the schema (e.g., a LongType()
         column will only accept integer-type inputs).
+
+        Use the same *args and **kwargs throughout all _getRecordDelimiter(), _getOutputDFclass() and _parseRecord()
         """
         
         raise NotImplementedError("calling an unimplemented abstract method _parseRecord()")
@@ -368,6 +373,7 @@ class AxlIO(ABC):
                 subprocess.run("gunzip " + file_path + " " + temp_file, shell=True)
                 return temp_file
 
+        Use the same *args and **kwargs as _getRecordDelimiter(), _getOutputDFclass() and _parseRecord()
         """
         
         # by default, not doing any processing, return the original filepath
@@ -378,6 +384,8 @@ class AxlIO(ABC):
         """
         override this method if you want to append additional dataframe-wide operations on the resulting ioDF
         object. Returns the resulting modified ioDF object.
+
+        Use the same *args and **kwargs as _getRecordDelimiter(), _getOutputDFclass() and _parseRecord()
         """
         
         return data
