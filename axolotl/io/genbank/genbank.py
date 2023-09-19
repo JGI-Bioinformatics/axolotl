@@ -99,3 +99,14 @@ class gbkIO(AxlIO):
                 text if len(text) < 50 else text[:50] + "..."
             ))
             return [None]
+    
+    @classmethod
+    def _postprocess(cls, data, df_type: str):
+        """
+        assign "source_path" to RawFeatDF
+        """
+
+        if df_type == "annotation":
+            data.df = data.df.withColumn("source_path", data.df.file_path)
+        
+        return data
