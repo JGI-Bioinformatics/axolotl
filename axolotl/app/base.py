@@ -8,6 +8,7 @@ from pyspark.sql import functions as F
 from pyspark.sql import types as T
 
 from axolotl.data import AxlDF
+from axolotl.utils.file import check_file_exists, make_dirs, fopen
 
 class AxlApp:
     """
@@ -63,13 +64,13 @@ class AxlApp:
             # pickle file that we can use to load an extra data within the ExampleApp
             # object.
             self._dummy_metadata = "just_a_string"
-            with open(path.join(self.__folder_path, "dummy.pkl"), "wb") as file:
+            with open(path.join(self._folder_path, "dummy.pkl"), "wb") as file:
                 pickle.dump(self._dummy_metadata, file)
             
         @abstractmethod
         def _loadExtraData(self):
             # here, we can load back the _dummy_metadata variable from the pickled file
-            with open(path.join(self.__folder_path, "dummy.pkl"), "rb") as file:
+            with open(path.join(self._folder_path, "dummy.pkl"), "rb") as file:
                 self._dummy_metadata = pickle.load(file)
 
         def getCDScount(self):
@@ -101,9 +102,9 @@ class AxlApp:
         do not instantiate AxlApp directly, instead use the appropriate getOrCreate() function
         """
 
-        self.__data = {}
-        self.__folder_path = app_folder_path
-        self.__metadata = metadata
+        self._data = {}
+        self._folder_path = app_folder_path
+        self._metadata = metadata
 
     @classmethod
     def getOrCreate(cls, app_folder_path: str, *args, **kwargs):
@@ -117,7 +118,7 @@ class AxlApp:
         """
 
         app_object = cls.__loadFolder(app_folder_path)
-        if not wf_object:
+        if not app_object:
             print("can't load  from folder, creating a new object")
             app_object = cls.__createAndSave(app_folder_path, *args, **kwargs)        
         if not app_object:
@@ -136,21 +137,21 @@ class AxlApp:
         getter for app's AxlDF objects, meant to be used within the _create() method
         """
 
-        return self.__data[key]
+        return self._data[key]
 
     def _setData(self, key: str, df: AxlDF):
         """
         setter for app's AxlDF objects, meant to be used within the _create() method
         """
 
-        self.__data[key] = df
+        self._data[key] = df
 
     def _saveData(self, key: str, overwrite: bool=False):
         """
         call this after creating the appropriate AxlDF object for the app's data
         """
 
-        self.__data[key].store(path.join(self.__folder_path, "data", key), overwrite=overwrite)
+        self._data[key].write(path.join(self._folder_path, "data", key), overwrite=overwrite)
 
     @classmethod
     def __createAndSave(cls, app_folder_path: str, *args, **kwargs):
@@ -160,7 +161,7 @@ class AxlApp:
         """
 
         # create a new empty data dir structure, along with metadata
-        if check_file_exists(wf_folder_path):
+        if check_file_exists(app_folder_path):
             raise Exception("Trying to create a new AxlApp folder but folder exists! {}".format(app_folder_path))
         created_obj = cls(app_folder_path, {
             "class_name": cls.__name__
@@ -182,7 +183,7 @@ class AxlApp:
 
         loaded_obj = None
         if check_file_exists(app_folder_path): # check if folder exists
-            # check metadata and load __data variable
+            # check metadata and load _data variable
             metadata_path = path.join(app_folder_path, "_metadata.json")
             if not check_file_exists(metadata_path):
                 raise FileNotFoundError("can't find _metadata.json!")
@@ -200,7 +201,7 @@ class AxlApp:
                     df_path = path.join(data_folder, key)
                     if not check_file_exists(df_path):
                         raise FileNotFoundError("can't find data folder {}!".format(key))
-                    loaded_obj._setData(key, data_class.load(df_path))
+                    loaded_obj._setData(key, data_class.read(df_path))
                 # load subclass-specific logic
                 loaded_obj._loadExtraData()
         return loaded_obj
@@ -211,9 +212,9 @@ class AxlApp:
         don't inherit or modify the json file.
         """
 
-        metadata_path = path.join(self.__folder_path, "_metadata.json")        
+        metadata_path = path.join(self._folder_path, "_metadata.json")        
         with fopen(metadata_path, "w") as outfile:
-            outfile.write(json.dumps(self.__metadata))
+            outfile.write(json.dumps(self._metadata))
 
 
     ################# TO BE IMPLEMENTED BY SUBCLASSES #################
