@@ -6,7 +6,6 @@ from axolotl.data import MetaDF
 from axolotl.data.sequence import NuclSeqDF
 from axolotl.data.annotation import RawFeatDF
 
-from abc import abstractmethod
 from typing import Dict
 from io import StringIO
 import json
