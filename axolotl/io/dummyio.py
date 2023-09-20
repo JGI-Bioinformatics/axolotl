@@ -13,7 +13,7 @@ class DummyIO(AxlIO):
 
     @classmethod
     @abstractmethod
-    def _getRecordDelimiter(cls) -> str:
+    def _getRecordDelimiter(cls, prefix: str="") -> str:
         return "\n"
 
     @classmethod
