@@ -1,5 +1,5 @@
 """
-Unit testing module for axolotl.io.base
+Unit testing module for axolotl.io.genbank
 """
 
 #####################################################################################
@@ -32,7 +32,7 @@ def spark(request):
 #####################################################################################
 
 
-def test_axl_io(spark):
+def test_axl_io_genbank(spark):
     sc = spark.sparkContext
 
     from axolotl.io.genbank import gbkIO
