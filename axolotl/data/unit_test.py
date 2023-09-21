@@ -38,7 +38,9 @@ def test_axl_df(spark):
 	print(">>> Testing AxlDF, ioDF and MetaDF <<<")
 
 	from axolotl.data import MetaDF # using MetaDF to test AxlDF and ioDF too
+	from axolotl.data import RelationDF
 	import pyspark.sql.types as T
+	import pyspark.sql.functions as F
 	from axolotl.utils.file import get_temp_dir
 	from os import path
 
@@ -59,3 +61,12 @@ def test_axl_df(spark):
 		MetaDF(dummy_df).write(path.join(tmp_dir, "stored_df"))
 		loaded_df = MetaDF.read(path.join(tmp_dir, "stored_df"))
 		assert loaded_df.countValids() == (3, 1)
+
+	print(">>> Testing RelationDF <<<")
+	axldf_1 = MetaDF(dummy_df)
+	axldf_2 = MetaDF(dummy_df)
+	join_df = axldf_1.df.join(axldf_2.df, "file_path").select(
+		axldf_1.df["idx"].alias("idx_1"),
+		axldf_2.df["idx"].alias("idx_2")
+	)
+	assert RelationDF(join_df).countValids() == (8, 0)
