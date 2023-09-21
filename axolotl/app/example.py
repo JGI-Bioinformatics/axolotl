@@ -6,7 +6,6 @@ from axolotl.io.genbank import gbkIO
 from axolotl.data.sequence import NuclSeqDF
 from axolotl.data.annotation import cdsDF
 
-from abc import abstractmethod
 from typing import Dict
 from os import path
 import pickle
@@ -15,7 +14,6 @@ import pickle
 class ExampleApp(AxlApp):
 
     @classmethod
-    @abstractmethod
     def _dataDesc(cls) -> Dict:
         # describe the app's "database" structure, in this case
         # it will have two tables: "contigs" (a NuclSeqDF) and
@@ -29,7 +27,6 @@ class ExampleApp(AxlApp):
             "cds": cdsDF
         }
 
-    @abstractmethod
     def _creationFunc(self, genbanks_path: str):
         # we override the *args and **kwargs with our own class-specific
         # parameters. In this case an exampleApp will be created by
@@ -54,7 +51,6 @@ class ExampleApp(AxlApp):
         with open(path.join(self._folder_path, "dummy.pkl"), "wb") as file:
             pickle.dump(self._dummy_metadata, file)
         
-    @abstractmethod
     def _loadExtraData(self):
         # here, we can load back the _dummy_metadata variable from the pickled file
         with open(path.join(self._folder_path, "dummy.pkl"), "rb") as file:
