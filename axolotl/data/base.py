@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from os import path
-from typing import Tuple, Dict
+from typing import Tuple, Dict, List
 import json
 
 from pyspark.sql import DataFrame, Row
@@ -47,7 +47,7 @@ class AxlDF(ABC):
 
     """
 
-    def __init__(self, df: DataFrame, override_idx: bool=False, keep_idx: bool=False):
+    def __init__(self, df: DataFrame, override_idx: bool=False, keep_idx: bool=False, loaded_metadata: Dict=None, sources: List=[]):
         """
         by default, an AxlDF instance can be started by supplying a corresponding pySpark DataFrame with correct schema.
         If a column 'idx' already exists in the supplied dataframe, users can choose between regenerating a new idx (guaranteed
@@ -77,6 +77,12 @@ class AxlDF(ABC):
             )
 
         self.df = df
+        if loaded_metadata:
+            self._id = loaded_metadata["id"]
+            self._sources = loaded_metadata["source_ids"]
+        else:
+            self._id = "{}#{}".format(self.__class__.__name__, id(self.df))
+            self._sources = [source._id for source in sources]
 
     @classmethod
     def getSchema(cls) -> T.StructType():
@@ -89,18 +95,6 @@ class AxlDF(ABC):
         for field in cls._getSchema():
             _schema = _schema.add(field)
         return _schema
-    
-    def getMetadata(self) -> Dict:
-        """
-        metadata stored as ._axolotl_metadata.json, this statically-typed dictionary
-        is only meant for backend class processing purposes and should never be used
-        to store runtime-based information
-        """
-        metadata = {
-            "class_name": self.__class__.__name__,
-            "schema": self.df.schema.jsonValue()
-        }
-        return metadata
 
     @classmethod
     def read(cls, src_parquet: str, num_partitions: int=200):
@@ -125,9 +119,9 @@ class AxlDF(ABC):
             used_schema = types.StructType.fromJson(metadata["schema"])
 
         if num_partitions !=200:
-            return cls(spark.read.schema(used_schema).parquet(src_parquet).repartition(num_partitions), keep_idx=True)
+            return cls(spark.read.schema(used_schema).parquet(src_parquet).repartition(num_partitions), keep_idx=True, loaded_metadata=metadata)
         else:
-            return cls(spark.read.schema(used_schema).parquet(src_parquet), keep_idx=True)
+            return cls(spark.read.schema(used_schema).parquet(src_parquet), keep_idx=True, loaded_metadata=metadata)
     
     def write(self, parquet_file_path: str, overwrite: bool=False, num_partitions: int=200) -> None:
         """
@@ -143,7 +137,13 @@ class AxlDF(ABC):
             self.df.write.mode("overwrite").option("schema", self.__class__.getSchema()).parquet(parquet_file_path)
         metadata_path = path.join(parquet_file_path, ".axolotl_metadata.json")        
         with fopen(metadata_path, "w") as outfile:
-            json.dump(self.getMetadata(), outfile)
+            metadata = {
+                "id": self._id,
+                "source_ids": self._sources,
+                "class_name": self.__class__.__name__,
+                "schema": self.df.schema.jsonValue()
+            }
+            json.dump(metadata, outfile)
 
     @classmethod
     def __validateRowNot(cls, row: Row) -> bool:
