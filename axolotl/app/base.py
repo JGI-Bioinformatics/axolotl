@@ -152,6 +152,8 @@ class AxlApp:
         """
 
         self._data[key].write(path.join(self._folder_path, "data", key), overwrite=overwrite)
+        # reload the variable so we won't recalculate the DF
+        self._data[key] = self._data[key].__class__.read(path.join(self._folder_path, "data", key))
 
     @classmethod
     def __createAndSave(cls, app_folder_path: str, *args, **kwargs):
