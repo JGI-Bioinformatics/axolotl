@@ -111,7 +111,7 @@ class bgcDF(ioDF):
                 
         if sequences is None:
             # return as is
-            return cls(df, override_idx=reindex, keep_idx=(not reindex))
+            return cls(df, override_idx=reindex, keep_idx=(not reindex), sources=[features])
         else: 
             # given sequences df, also try grab nt_sequence data
             bgcs_lists = df.groupBy(["source_path", "seq_id"]).agg(
@@ -140,4 +140,4 @@ class bgcDF(ioDF):
                         F.when(joined.contig_nt_length <= joined.location.end, F.lit(True)).otherwise(F.lit(False))
                     )
                 )
-            return cls(joined.select(df.columns), override_idx=reindex, keep_idx=(not reindex))
+            return cls(joined.select(df.columns), override_idx=reindex, keep_idx=(not reindex), sources=[features, sequences])

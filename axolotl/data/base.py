@@ -76,13 +76,36 @@ class AxlDF(ABC):
                 f"schema={self.__class__.__name__}.getSchema() when creating the pySpark DataFrame object"
             )
 
-        self.df = df
+        self._df = df
         if loaded_metadata:
             self._id = loaded_metadata["id"]
             self._sources = loaded_metadata["source_ids"]
         else:
             self._id = "{}#{}".format(self.__class__.__name__, id(self.df))
             self._sources = [source._id for source in sources]
+
+    @property
+    def df(self):
+        """
+        getter to fetch the underlying pySpark DataFrame
+        """
+        return self._df
+
+    @df.setter
+    def df(self, new_df):
+        """
+        update the underlying pySpark DataFrame, also, update
+        the AxlDF's id since now the data has been changed.
+        """
+        self._df = new_df
+        self._id = "{}#{}".format(self.__class__.__name__, id(self.df))
+
+    @df.deleter
+    def df(self):
+        """
+        deleter function for pySpark DataFrame
+        """
+        del self._df
 
     @classmethod
     def getSchema(cls) -> T.StructType():

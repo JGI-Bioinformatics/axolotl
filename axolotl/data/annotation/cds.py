@@ -113,7 +113,7 @@ class cdsDF(ioDF):
         
         if sequences is None:
             # return as is
-            return cls(cds_df, override_idx=reindex, keep_idx=(not reindex))
+            return cls(cds_df, override_idx=reindex, keep_idx=(not reindex), sources=[features])
         else:
             # given sequences df, also try to translate missing CDS translations
             missing_cds = cds_df.filter("aa_sequence is NULL").fillna(-1, ["transl_table"]).groupBy(["source_path", "seq_id"]).agg(
@@ -123,7 +123,7 @@ class cdsDF(ioDF):
             )
             if len(missing_cds.rdd.take(1)) < 1:
                 # no translations needed,  returns as is
-                return cls(cds_df, override_idx=reindex, keep_idx=(not reindex))
+                return cls(cds_df, override_idx=reindex, keep_idx=(not reindex), sources=[features, sequences])
             joined = missing_cds.join(sequences.df, [missing_cds.source_path == sequences.df.file_path, missing_cds.seq_id == sequences.df.seq_id])\
                 .select(sequences.df.sequence, missing_cds.row_ids, missing_cds.locations, missing_cds.transl_tables)
             translated = joined.rdd.flatMap(
@@ -139,5 +139,5 @@ class cdsDF(ioDF):
                     "aa_sequence",
                     F.when(cds_df.aa_sequence.isNotNull(), cds_df.aa_sequence).otherwise(translated.seq)
                 ).select(cds_df.columns),
-                override_idx=reindex, keep_idx=(not reindex)
+                override_idx=reindex, keep_idx=(not reindex), sources=[features, sequences]
             )
