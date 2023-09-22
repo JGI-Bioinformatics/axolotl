@@ -60,7 +60,7 @@ class gbkIO(AxlIO):
                                 "type": feature.type,
                                 "location": [
                                     {
-                                        "start": int(feature.location.start),
+                                        "start": int(feature.location.start) + 1,
                                         "start_partial": False,
                                         "end": int(feature.location.end),
                                         "end_partial": False,
