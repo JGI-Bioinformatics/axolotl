@@ -50,7 +50,7 @@ def test_axl_app(spark):
 
         print(">>> Testing creation of new exampleApp and basic function calling... <<<")
         exp_app = ExampleApp.getOrCreate(path_app_storage, genbanks_path = path.join(path_input_folder, "*.gbk"))
-        #assert sum([row["count"] for row in exp_app.getCDScount().rdd.collect()]) == 129
+        assert sum([row["count"] for row in exp_app.getCDScount().rdd.collect()]) == 129
 
         print(">>> Testing loading of previous exampleApp and extradata calling... <<<")
         exp_app_2 = ExampleApp.getOrCreate(path_app_storage)
