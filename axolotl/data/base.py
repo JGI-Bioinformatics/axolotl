@@ -107,6 +107,12 @@ class AxlDF(ABC):
         """
         del self._df
 
+    def updateSources(self, sources: List):
+        """
+        update the _sources attribute post object instantiation
+        """
+        self._sources = [source._id for source in sources]
+
     @classmethod
     def getSchema(cls) -> T.StructType():
         """
@@ -154,6 +160,9 @@ class AxlDF(ABC):
         """
         if check_file_exists(parquet_file_path) and (not overwrite):
             raise Exception(f"path exists! {parquet_file_path}, please set overwrite to True.")
+        if overwrite:
+            self.df.persist() # in case of overwriting the original source parquet file
+            self.df.count()
         if num_partitions != 200:
             self.df.repartition(num_partitions).write.mode("overwrite").option("schema", self.__class__.getSchema()).parquet(parquet_file_path)
         else:
