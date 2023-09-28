@@ -73,7 +73,7 @@ class AxlIO(ABC):
     """
     
     @classmethod
-    def loadSmallFiles(cls, file_pattern: str, *args, **kwargs) -> ioDF:
+    def loadSmallFiles(cls, file_pattern: str, minPartitions: int=None, *args, **kwargs) -> ioDF:
         """
         take an input file pattern (in "glob"-style) and parse every identifiable files into
         an ioDF object. Always make sure that the input files are texts (i.e., unzipped) since
@@ -86,15 +86,18 @@ class AxlIO(ABC):
         # input check
         if not isinstance(file_pattern, str):
             raise TypeError("expected file_pattern to be a string")
+
+        # fetch the number of nodes, and use for setting minPartitions number
+        num_nodes = len([executor.host() for executor in spark._jsc.sc().statusTracker().getExecutorInfos()])
             
         return cls.__postprocess(cls._getOutputDFclass(*args, **kwargs)(
-            sc.wholeTextFiles(file_pattern)\
+            sc.wholeTextFiles(file_pattern, minPartitions=minPartitions if minPartitions else num_nodes)\
                 .flatMap(lambda x: cls._parseFile(x[0], x[1], *args, **kwargs))\
                 .toDF(schema = cls._getOutputDFclass(*args, **kwargs)._getSchema())
         ), *args, **kwargs)
 
     @classmethod
-    def concatSmallFiles(cls, file_pattern: str, path_output: str, num_partitions: int=-1):
+    def concatSmallFiles(cls, file_pattern: str, path_output: str, minPartitions: int=None, num_partitions: int=-1):
         """
         take an input file pattern (in "glob"-style) and concatenate them into chunks of
         bigger files (defined by 'num_partitions') to allow efficient storage in distributed
@@ -109,8 +112,11 @@ class AxlIO(ABC):
         if not isinstance(file_pattern, str):
             raise TypeError("expected file_pattern to be a string")
         
+        # fetch the number of nodes, and use for setting minPartitions number
+        num_nodes = len([executor.host() for executor in spark._jsc.sc().statusTracker().getExecutorInfos()])
+
         # import RDD
-        rdd_imported = sc.wholeTextFiles(file_pattern)\
+        rdd_imported = sc.wholeTextFiles(file_pattern, minPartitions=minPartitions if minPartitions else num_nodes)\
         .reduceByKey(lambda row1, row2: row1)\
         .map(lambda x: cls._getFileDelimiter()[0] + x[0] + cls._getFileDelimiter()[1] + x[1])\
         
