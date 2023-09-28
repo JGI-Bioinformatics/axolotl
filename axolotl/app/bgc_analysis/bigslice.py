@@ -27,6 +27,7 @@ class BigsliceApp(AxlApp):
 
     def _creationFunc(self, sequences: NuclSeqDF, features: RawFeatDF, source_type: str="antismash"):
         """
+        extract bgc_df, cds_df and build cds_to_bgc dataframe that will act as BigsliceApp's core data
         """
 
         # first, extract bgcDF from features
@@ -72,11 +73,11 @@ class BigsliceApp(AxlApp):
 
     ### BigsliceApp-specific functions ###
 
-    def getBGCVectors(self, bigslice_db_path: str) -> DataFrame:
+    def getBGCVectors(self, bigslice_db_path: str, top_k: int=3) -> DataFrame:
 
         spark, sc = get_spark_session_and_context()
 
-        # first, read bigslice_db folder to get the unique db id
+        # first, read bigslice_db folder to get the unique db ids
         biopfam_md5, subpfam_md5 = scan_bigslice_db_folder(bigslice_db_path)
 
         # fetch current bgc, cds and cds_to_bgc ids
@@ -97,8 +98,8 @@ class BigsliceApp(AxlApp):
             make_dirs(feature_folder)
 
         # check if features are extracted
-        feature_pq_path = path.join(feature_folder, "feat-{}-{}".format(
-            biopfam_md5, subpfam_md5
+        feature_pq_path = path.join(feature_folder, "feat-k{}-{}-{}".format(
+            top_k, biopfam_md5, subpfam_md5
         ))
         if not check_file_exists(feature_pq_path):
 
@@ -159,26 +160,82 @@ class BigsliceApp(AxlApp):
                         "subpfam", F.udf(lambda name: int(name.split(".aligned_c")[1]), T.LongType())("hmm_name")
                     )\
                     .select("query_name", "corepfam", "subpfam", "bitscore")\
-                .withColumn("rank", F.row_number().over(
-                    W.partitionBy(["query_name", "corepfam"]).orderBy(F.col("bitscore").desc())
-                ))\
+                    .withColumn("rank", F.row_number().over(
+                        W.partitionBy(["query_name", "corepfam"]).orderBy(F.col("bitscore").desc())
+                    ))\
                 .select("query_name", "corepfam", "subpfam").groupBy(["query_name", "corepfam"]).agg(
                     F.collect_list("subpfam").alias("sub_pfams")
-                )\
-                .withColumn(
+                ).withColumn(
                     "cds_id", F.udf(lambda name: int(name.split("|")[0]), T.LongType())("query_name")
-                )\
-                .withColumn(
+                ).withColumn(
                     "cds_from", F.udf(lambda name: int(name.split("|")[1].split("-")[0]), T.LongType())("query_name")
-                )\
-                .withColumn(
+                ).withColumn(
                     "cds_to", F.udf(lambda name: int(name.split("|")[1].split("-")[1]), T.LongType())("query_name")
                 )\
                 .select("cds_id", "cds_from", "cds_to", "corepfam", "sub_pfams")
 
                 result_df.write.parquet(subpfam_pq_path)
 
-            # extract features and save parquet
-            pass
+            # first, get merged features dataframe of biopfam hits and subpfam hits
+            cds_to_bgc_df = self.getData("cds_to_bgc").df
+            biopfam_scan_df = spark.read.parquet(biopfam_pq_path)
+            subpfam_scan_df = spark.read.parquet(subpfam_pq_path)
 
-        return spark.read.parquet(subpfam_pq_path) ## todo: replace with features df path
+            # example result of this step:
+            # --------------------------------------------------------
+            # | bgc_id | biopfams                                    |
+            # --------------------------------------------------------
+            # | 0      | [["PKS_KS", "255"], ["PKS_AT", "255"] ...]] |
+            # --------------------------------------------------------
+            biopfam_feat_df = biopfam_scan_df.join(cds_to_bgc_df, [biopfam_scan_df.cds_id == cds_to_bgc_df.idx_1]).select(
+                biopfam_scan_df.hmm_acc, cds_to_bgc_df.idx_2.alias("bgc_id")
+            ).distinct().groupBy("bgc_id").agg(
+                F.udf(
+                    lambda biopfams: [[biopfam, 255] for biopfam in biopfams],
+                    T.ArrayType(T.ArrayType(T.StringType()))
+                )(F.collect_list("hmm_acc")).alias("biopfams")
+            ).groupBy("bgc_id").agg(F.flatten(F.collect_list("biopfams")).alias("biopfams"))
+
+            # example result of this step:
+            # ------------------------------------------------------------
+            # | bgc_id | subpfams                                        |
+            # ------------------------------------------------------------
+            # | 0      | [["PKS_KS:1", "255"], ["PKS_KS:5", "155"] ...]] |
+            # ------------------------------------------------------------
+            subpfam_feat_df = subpfam_scan_df.join(cds_to_bgc_df, [subpfam_scan_df.cds_id == cds_to_bgc_df.idx_1]).select(
+                F.udf(
+                    lambda corepfam, subpfams: [
+                        ["{}:{}".format(corepfam, subpfam), (int(255 - int((255 / top_k) * i)))] for i, subpfam in enumerate(subpfams[:top_k])
+                    ],
+                    T.ArrayType(T.ArrayType(T.StringType()))
+                )(F.col("corepfam"), F.col("sub_pfams")).alias("subpfams"), cds_to_bgc_df.idx_2.alias("bgc_id"), 
+            ).groupBy("bgc_id").agg(F.flatten(F.collect_list("subpfams")).alias("subpfams"))
+            
+            def get_feature_vector(biopfams, subpfams):
+                # merge all key-value pairs, retain max values for every unique keys
+                merged_features = list(map(
+                    lambda x: (x[0], int(x[1])),
+                    (biopfams + subpfams if (biopfams is not None and subpfams is not None)
+                        else (biopfams if biopfams else (subpfams if subpfams else [])))
+                ))
+                dict_feat = {}
+                for (key, val) in merged_features:
+                    dict_feat[key] = max(val, dict_feat.get(key, 0))                
+                return dict_feat
+
+            # merge both biopfam features and subpfam features, then store feature df
+            # example result of this step:
+            # ------------------------------------------------------
+            # | bgc_id | features                                  |
+            # ------------------------------------------------------
+            # | 0      | { "PKS_KS:1": 255, "PKS_KS:5": 155, ... } |
+            # ------------------------------------------------------
+            feature_df = biopfam_feat_df.join(subpfam_feat_df, "bgc_id", "outer").select(
+                F.col("bgc_id"),
+                F.udf(
+                    get_feature_vector, T.MapType(T.StringType(), T.IntegerType())
+                )(F.col("biopfams"), F.col("subpfams")).alias("features")
+            )
+            feature_df.write.parquet(feature_pq_path)
+
+        return spark.read.parquet(feature_pq_path)
