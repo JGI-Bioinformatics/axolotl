@@ -126,7 +126,7 @@ class AxlDF(ABC):
         return _schema
 
     @classmethod
-    def read(cls, src_parquet: str, num_partitions: int=200):
+    def read(cls, src_parquet: str, num_partitions: int=None):
         """
         reads a previously-written AxlDF instance
         """
@@ -147,12 +147,13 @@ class AxlDF(ABC):
         if used_schema == None:
             used_schema = types.StructType.fromJson(metadata["schema"])
 
-        if num_partitions !=200:
-            return cls(spark.read.schema(used_schema).parquet(src_parquet).repartition(num_partitions), keep_idx=True, loaded_metadata=metadata)
-        else:
-            return cls(spark.read.schema(used_schema).parquet(src_parquet), keep_idx=True, loaded_metadata=metadata)
+        df = spark.read.schema(used_schema).parquet(src_parquet)
+        if num_partitions:
+            df =  df.repartition(num_partitions)
+
+        return cls(df, keep_idx=True, loaded_metadata=metadata)
     
-    def write(self, parquet_file_path: str, overwrite: bool=False) -> None:
+    def write(self, parquet_file_path: str, overwrite: bool=False, num_partitions: int=None) -> None:
         """
         write an AxlDF instance into a Parquet-like folder structure. It will contains both the Parquet
         'fragment' files and a corresponding .axolotl_metadata.json file to support loading back into the
@@ -168,13 +169,19 @@ class AxlDF(ABC):
                     with fopen(metadata_path) as infile:
                         metadata = json.load(infile)
                 if metadata["id"] != self._id:
-                    self.df.persist() # need this because we're overriding the source parquet file
-                    self.df.count()
-                    self.df.write.mode("overwrite").option("schema", self.__class__.getSchema()).parquet(parquet_file_path)
+                    df = self.df
+                    if num_partitions:
+                        df = df.repartition(num_partitions)
+                    df.persist() # need this because we're overriding the source parquet file
+                    df.count()
+                    df.write.mode("overwrite").option("schema", self.__class__.getSchema()).parquet(parquet_file_path)
             else:
                 raise Exception(f"path exists! {parquet_file_path}, please set overwrite to True.")
         else:
-            self.df.write.option("schema", self.__class__.getSchema()).parquet(parquet_file_path)
+            df = self.df
+            if num_partitions:
+                df = df.repartition(num_partitions)
+            df.write.option("schema", self.__class__.getSchema()).parquet(parquet_file_path)
 
         metadata_path = path.join(parquet_file_path, ".axolotl_metadata.json")        
         with fopen(metadata_path, "w") as outfile:
