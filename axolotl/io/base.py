@@ -73,7 +73,7 @@ class AxlIO(ABC):
     """
     
     @classmethod
-    def loadSmallFiles(cls, file_pattern: str, minPartitions: int=None, *args, **kwargs) -> ioDF:
+    def loadSmallFiles(cls, file_pattern: str, minPartitions: int=None, skip_malformed_record=False, *args, **kwargs) -> ioDF:
         """
         take an input file pattern (in "glob"-style) and parse every identifiable files into
         an ioDF object. Always make sure that the input files are texts (i.e., unzipped) since
@@ -92,12 +92,12 @@ class AxlIO(ABC):
             
         return cls.__postprocess(cls._getOutputDFclass(*args, **kwargs)(
             sc.wholeTextFiles(file_pattern, minPartitions=minPartitions if minPartitions else num_nodes)\
-                .flatMap(lambda x: cls._parseFile(x[0], x[1], *args, **kwargs))\
+                .flatMap(lambda x: cls._parseFile(x[0], x[1], skip_malformed_record=skip_malformed_record, *args, **kwargs))\
                 .toDF(schema = cls._getOutputDFclass(*args, **kwargs)._getSchema())
         ), *args, **kwargs)
 
     @classmethod
-    def loadSmallFiles2(cls, list_of_files_path: str, minPartitions: int=None, *args, **kwargs) -> ioDF:
+    def loadSmallFiles2(cls, list_of_files_path: str, minPartitions: int=None, skip_malformed_record=False, *args, **kwargs) -> ioDF:
         """
         Given a path to a text file with the list of all input file paths, use Spark to
         parse all the input files and produce the respective AxlDF object.
@@ -112,7 +112,7 @@ class AxlIO(ABC):
         return cls.__postprocess(cls._getOutputDFclass(*args, **kwargs)(
             sc.textFile(list_of_files_path, minPartitions=minPartitions if minPartitions else num_nodes).flatMap(
                 lambda file_path: cls._parseFile(
-                    file_path, fopen(file_path, "r").read(), *args, **kwargs
+                    file_path, fopen(file_path, "r").read(), skip_malformed_record=skip_malformed_record, *args, **kwargs
                 )
             ).toDF(schema = cls._getOutputDFclass(*args, **kwargs)._getSchema())
         ), *args, **kwargs)
@@ -300,10 +300,18 @@ class AxlIO(ABC):
         """
 
         result = []
-        for record_text in text.split(cls._getRecordDelimiter(*args, **kwargs)):
+        for record_id, record_text in enumerate(text.split(cls._getRecordDelimiter(*args, **kwargs))):
             if record_text == "":
                 continue
-            parsed_array = cls._parseRecord(record_text, *args, **kwargs)
+
+            try:
+                parsed_array = cls._parseRecord(record_text, *args, **kwargs)
+            except:
+                if skip_malformed_record:
+                    # todo: write up warning and save it somewhere
+                    continue
+                else:
+                    raise Exception("Failed when parsing record#{} in {}!!!".format(record_id, file_path))
             for parsed in parsed_array:
                 if parsed == None and skip_malformed_record:
                     continue
