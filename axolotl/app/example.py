@@ -5,6 +5,7 @@ from axolotl.app.base import AxlApp
 from axolotl.io.genbank import gbkIO
 from axolotl.data.sequence import NuclSeqDF
 from axolotl.data.annotation import cdsDF
+from axolotl.utils.file import fopen
 
 from typing import Dict
 from os import path
@@ -48,12 +49,12 @@ class ExampleApp(AxlApp):
         # pickle file that we can use to load an extra data within the ExampleApp
         # object.
         self._dummy_metadata = "just_a_string"
-        with open(path.join(self._folder_path, "dummy.pkl"), "wb") as file:
+        with fopen(path.join(self._folder_path, "dummy.pkl"), "wb") as file:
             pickle.dump(self._dummy_metadata, file)
         
     def _loadExtraData(self):
         # here, we can load back the _dummy_metadata variable from the pickled file
-        with open(path.join(self._folder_path, "dummy.pkl"), "rb") as file:
+        with fopen(path.join(self._folder_path, "dummy.pkl"), "rb") as file:
             self._dummy_metadata = pickle.load(file)
 
     def getCDScount(self):
