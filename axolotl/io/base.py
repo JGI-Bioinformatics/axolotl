@@ -97,18 +97,20 @@ class AxlIO(ABC):
         ), *args, **kwargs)
 
     @classmethod
-    def loadSmallFiles2(cls, list_of_files_path: str, *args, **kwargs) -> ioDF:
+    def loadSmallFiles2(cls, list_of_files_path: str, minPartitions: int=None, *args, **kwargs) -> ioDF:
         """
-        take an input file pattern (in "glob"-style) and parse every identifiable files into
-        an ioDF object. Always make sure that the input files are texts (i.e., unzipped) since
-        this method will only be able to read text files.
+        Given a path to a text file with the list of all input file paths, use Spark to
+        parse all the input files and produce the respective AxlDF object.
         Use params to pass any subclass-specific parameters into your parsing.
         """
 
         spark, sc = get_spark_session_and_context()
+
+        # fetch the number of nodes, and use for setting minPartitions number
+        num_nodes = len([executor.host() for executor in spark._jsc.sc().statusTracker().getExecutorInfos()])
             
         return cls.__postprocess(cls._getOutputDFclass(*args, **kwargs)(
-            sc.textFile(list_of_files_path).flatMap(
+            sc.textFile(list_of_files_path, minPartitions=minPartitions if minPartitions else num_nodes).flatMap(
                 lambda file_path: cls._parseFile(
                     file_path, fopen(file_path, "r").read(), *args, **kwargs
                 )
