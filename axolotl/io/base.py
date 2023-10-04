@@ -6,7 +6,7 @@ from pyspark.sql import DataFrame, Row
 from pyspark.sql import functions as F
 from pyspark.sql import types as T
 
-from axolotl.utils.file import check_file_exists, is_directory, parse_path_type, get_temp_dir
+from axolotl.utils.file import check_file_exists, is_directory, parse_path_type, get_temp_dir, fopen
 from axolotl.utils.spark import get_spark_session_and_context
 
 from axolotl.data import ioDF
@@ -94,6 +94,25 @@ class AxlIO(ABC):
             sc.wholeTextFiles(file_pattern, minPartitions=minPartitions if minPartitions else num_nodes)\
                 .flatMap(lambda x: cls._parseFile(x[0], x[1], *args, **kwargs))\
                 .toDF(schema = cls._getOutputDFclass(*args, **kwargs)._getSchema())
+        ), *args, **kwargs)
+
+    @classmethod
+    def loadSmallFiles2(cls, list_of_files_path: str, *args, **kwargs) -> ioDF:
+        """
+        take an input file pattern (in "glob"-style) and parse every identifiable files into
+        an ioDF object. Always make sure that the input files are texts (i.e., unzipped) since
+        this method will only be able to read text files.
+        Use params to pass any subclass-specific parameters into your parsing.
+        """
+
+        spark, sc = get_spark_session_and_context()
+            
+        return cls.__postprocess(cls._getOutputDFclass(*args, **kwargs)(
+            sc.textFile(list_of_files_path).flatMap(
+                lambda file_path: cls._parseFile(
+                    file_path, fopen(file_path, "r").read(), *args, **kwargs
+                )
+            ).toDF(schema = cls._getOutputDFclass(*args, **kwargs)._getSchema())
         ), *args, **kwargs)
 
     @classmethod
