@@ -26,16 +26,16 @@ class NuclSeqDF(SeqDF):
         a mappable class method to slice a sequence according to specific location.
         Input is a dictionary containing {"start": int, "end": int and "strand": [-1, 0, 1]}
         """
-        reverse = loc.strand == -1
+        reverse = loc["strand"] == -1
         if reverse:
             convert = {
             "A": "T", "T": "A", "G": "C", "C": "G",
             "a": "t", "t": "a", "g": "c", "c": "g"
             }
-            snippet = seq[loc.end-1:loc.start-2:-1] if loc.start > 1 else seq[loc.end-1::-1]
+            snippet = seq[loc["end"]-1:loc["start"]-2:-1] if loc["start"] > 1 else seq[loc["end"]-1::-1]
             snippet = "".join([convert.get(c, c) for c in snippet])
         else:
-            snippet = seq[loc.start-1:loc.end]
+            snippet = seq[loc["start"]-1:loc["end"]]
         return snippet
 
 
