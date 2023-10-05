@@ -127,7 +127,11 @@ class bgcDF(ioDF):
                 lambda row: zip(row["row_ids"], [len(row["sequence"])]*len(row["locations"]), [
                     str(NuclSeqDF.fetch_seq(row["sequence"], loc)) for i, loc in enumerate(row["locations"])
                 ])
-            ).toDF(["idx", "contig_nt_length", "seq"])
+            ).toDF(["idx", "contig_nt_length", "seq"], T.StructType([
+                T.StructField("idx", T.LongType()),
+                T.StructField("contig_nt_length", T.LongType()),
+                T.StructField("seq", T.StringType())
+            ]))
             joined = df.join(bgc_sequences, "idx", "left").withColumn(
                 "nt_seq",
                 F.when(F.lit(True), bgc_sequences.seq)

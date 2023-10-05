@@ -133,7 +133,10 @@ class cdsDF(ioDF):
                         row.transl_tables[i]
                     )) for i, loc in enumerate(row.locations)
                 ])
-            ).toDF(["idx", "seq"])
+            ).toDF(["idx", "seq"], T.StructType([
+                T.StructField("idx", T.LongType()),
+                T.StructField("seq", T.StringType())
+            ]))
             return cls(
                 cds_df.join(translated, "idx", "left").withColumn(
                     "aa_sequence",
