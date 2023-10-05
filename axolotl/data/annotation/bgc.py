@@ -127,7 +127,7 @@ class bgcDF(ioDF):
                 lambda row: zip(row["row_ids"], [len(row["sequence"])]*len(row["locations"]), [
                     str(NuclSeqDF.fetch_seq(row["sequence"], loc)) for i, loc in enumerate(row["locations"])
                 ])
-            ).toDF(["idx", "contig_nt_length", "seq"], T.StructType([
+            ).toDF(T.StructType([
                 T.StructField("idx", T.LongType()),
                 T.StructField("contig_nt_length", T.LongType()),
                 T.StructField("seq", T.StringType())

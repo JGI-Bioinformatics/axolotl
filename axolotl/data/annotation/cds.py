@@ -133,7 +133,7 @@ class cdsDF(ioDF):
                         row.transl_tables[i]
                     )) for i, loc in enumerate(row.locations)
                 ])
-            ).toDF(["idx", "seq"], T.StructType([
+            ).toDF(T.StructType([
                 T.StructField("idx", T.LongType()),
                 T.StructField("seq", T.StringType())
             ]))
