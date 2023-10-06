@@ -121,9 +121,6 @@ class cdsDF(ioDF):
                 F.collect_list("location").alias("locations"),
                 F.collect_list("transl_table").alias("transl_tables")
             )
-            if len(missing_cds.rdd.take(1)) < 1:
-                # no translations needed,  returns as is
-                return cls(cds_df, override_idx=reindex, keep_idx=(not reindex), sources=[features, sequences])
             joined = missing_cds.join(sequences.df, [missing_cds.source_path == sequences.df.file_path, missing_cds.seq_id == sequences.df.seq_id])\
                 .select(sequences.df.sequence, missing_cds.row_ids, missing_cds.locations, missing_cds.transl_tables)
             translated = joined.rdd.flatMap(
