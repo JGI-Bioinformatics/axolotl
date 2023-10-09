@@ -113,7 +113,7 @@ class cdsDF(ioDF):
 
         return cls(cds_df, override_idx=reindex, keep_idx=(not reindex), sources=[features])
 
-    def translateAAs(self, sequences: NuclSeqDF, translate_all=False):
+    def translateAAs(self, sequences: NuclSeqDF, translate_all: bool=False):
         """
         Given the original NuclSeqDF (i.e., contig sequences), try to translate missing AAs in the cds.
         If translate_all = True, it will override existing AAs also.
