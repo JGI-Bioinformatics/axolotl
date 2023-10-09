@@ -82,7 +82,7 @@ class cdsDF(ioDF):
             return None
 
     @classmethod
-    def fromRawFeatDF(cls, features: RawFeatDF, sequences: NuclSeqDF=None, reindex: bool=True):
+    def fromRawFeatDF(cls, features: RawFeatDF, reindex: bool=True):
         """
         the primary class method to use for generating a cdsDF given a previously-parsed RawFeatDF.
         This method will filter all rows in the RawFeatDF with type=='CDS' and extract CDS-specific
@@ -110,34 +110,44 @@ class cdsDF(ioDF):
                     "locus_tag", "gene", "product", "translation", "transl_table"
                 ]]
         }).toDF(cls.getSchema())
+
+        return cls(cds_df, override_idx=reindex, keep_idx=(not reindex), sources=[features])
+
+    def translateAAs(self, sequences: NuclSeqDF, translate_all=False):
+        """
+        Given the original NuclSeqDF (i.e., contig sequences), try to translate missing AAs in the cds.
+        If translate_all = True, it will override existing AAs also.
+        """
+
+        cds_df = self.df
         
-        if sequences is None:
-            # return as is
-            return cls(cds_df, override_idx=reindex, keep_idx=(not reindex), sources=[features])
-        else:
-            # given sequences df, also try to translate missing CDS translations
-            missing_cds = cds_df.filter("aa_sequence is NULL").fillna(-1, ["transl_table"]).groupBy(["source_path", "seq_id"]).agg(
-                F.collect_list("idx").alias("row_ids"),
-                F.collect_list("location").alias("locations"),
-                F.collect_list("transl_table").alias("transl_tables")
-            )
-            joined = missing_cds.join(sequences.df, [missing_cds.source_path == sequences.df.file_path, missing_cds.seq_id == sequences.df.seq_id])\
-                .select(sequences.df.sequence, missing_cds.row_ids, missing_cds.locations, missing_cds.transl_tables)
-            translated = joined.rdd.flatMap(
-                lambda row: zip(row.row_ids, [
-                    (cls.translate_seq(
-                        NuclSeqDF.fetch_seq(row.sequence, loc),
-                        row.transl_tables[i]
-                    )) for i, loc in enumerate(row.locations)
-                ])
-            ).toDF(T.StructType([
-                T.StructField("idx", T.LongType()),
-                T.StructField("seq", T.StringType())
-            ]))
-            return cls(
-                cds_df.join(translated, "idx", "left").withColumn(
-                    "aa_sequence",
-                    F.when(cds_df.aa_sequence.isNotNull(), cds_df.aa_sequence).otherwise(translated.seq)
-                ).select(cds_df.columns),
-                override_idx=reindex, keep_idx=(not reindex), sources=[features, sequences]
-            )
+        missing_cds = cds_df
+        if not translate_all:
+            missing_cds = missing_cds.filter("aa_sequence is NULL")
+        missing_cds = missing_cds.fillna(-1, ["transl_table"]).groupBy(["source_path", "seq_id"]).agg(
+            F.collect_list("idx").alias("row_ids"),
+            F.collect_list("location").alias("locations"),
+            F.collect_list("transl_table").alias("transl_tables")
+        )
+        joined = missing_cds.join(sequences.df, [missing_cds.source_path == sequences.df.file_path, missing_cds.seq_id == sequences.df.seq_id])\
+            .select(sequences.df.sequence, missing_cds.row_ids, missing_cds.locations, missing_cds.transl_tables)
+        translated = joined.rdd.flatMap(
+            lambda row: zip(row.row_ids, [
+                (cdsDF.translate_seq(
+                    NuclSeqDF.fetch_seq(row.sequence, loc),
+                    row.transl_tables[i]
+                )) for i, loc in enumerate(row.locations)
+            ])
+        ).toDF(T.StructType([
+            T.StructField("idx", T.LongType()),
+            T.StructField("seq", T.StringType())
+        ]))
+
+        orig_columns = cds_df.columns
+        self.df = cds_df.join(translated, "idx", "left").withColumn(
+            "aa_sequence",
+            F.when(cds_df.aa_sequence.isNotNull(), cds_df.aa_sequence).otherwise(translated.seq)
+        ).select(orig_columns)
+        self._sources = [self._sources[0], sequences._id]
+
+        return self
