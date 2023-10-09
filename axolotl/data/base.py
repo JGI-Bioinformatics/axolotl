@@ -97,7 +97,7 @@ class AxlDF(ABC):
         update the underlying pySpark DataFrame, also, update
         the AxlDF's id since now the data has been changed.
         """
-        self._df = new_df
+        self._df = new_df.select(self.__class__.getSchema().fieldNames())
         self._id = "{}#{}".format(self.__class__.__name__, id(self.df))
 
     @df.deleter
