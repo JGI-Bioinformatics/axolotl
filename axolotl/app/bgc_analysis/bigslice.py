@@ -25,48 +25,49 @@ class BigsliceApp(AxlApp):
             "cds_to_bgc": RelationDF
         }
 
-    def _creationFunc(self, sequences: NuclSeqDF, features: RawFeatDF, source_type: str="antismash"):
+    def _creationFunc(self, features: RawFeatDF, source_type: str="antismash"):
         """
         extract bgc_df, cds_df and build cds_to_bgc dataframe that will act as BigsliceApp's core data
         """
 
-        # first, extract bgcDF from features
-        bgc_df = bgcDF.fromRawFeatDF(features, sequences, source_type = source_type)
+        print("Extracting & saving bgcDF from RawFeatDF...")
+        bgc_df = bgcDF.fromRawFeatDF(features, source_type = source_type)
         self._setData("bgc", bgc_df)
         self._saveData("bgc")
         bgc_df = self._getData("bgc")  
 
-        # then, extract unfiltered cdsDF from features (might be genomic)
-        cds_df = cdsDF.fromRawFeatDF(features, sequences)
+        print("Calculating cdsDF and cds_to_bgc table...")
+        cds_df = cdsDF.fromRawFeatDF(features)
+        joined = bgc_df.df.alias("bgc").join(cds_df.df.alias("cds"), [
+            F.col("bgc.file_path") == F.col("cds.file_path"),
+            F.col("bgc.source_path") == F.col("cds.source_path"),
+            F.col("bgc.seq_id") == F.col("cds.seq_id"),
+            F.col("bgc.location.start") <= F.col("cds.location.start"),
+            F.col("bgc.location.end") >= F.col("cds.location.end")
+        ])\
+            .withColumn("cds.idx", F.monotonically_increasing_id())\
+            .select("cds.*", F.col("bgc.idx").alias("bgc_id"))
+        joined.persist() # need to persist so we don't recalculate cdsDF
+        joined.count()
 
-        # perform join to match only cds in bgcs
-        # idx_1 == cds, idx_2 == bgc
-        cds_bgc_df = RelationDF(bgc_df.df.join(cds_df.df, [
-            bgc_df.df.file_path == cds_df.df.file_path,
-            bgc_df.df.source_path == cds_df.df.source_path,
-            bgc_df.df.seq_id == cds_df.df.seq_id,
-            bgc_df.df.location.start <= cds_df.df.location.start,
-            bgc_df.df.location.end >= cds_df.df.location.end
-        ]).select(
-            F.when(F.lit(True), cds_df.df.idx).alias("idx_1"),
-            F.when(F.lit(True), bgc_df.df.idx).alias("idx_2")
-        ))
+        print("Saving cdsDF...")
+        cds_df = cdsDF(
+            joined.select(cdsDF.getSchema().fieldNames()),
+            keep_idx=True,
+            sources = [features]
+        )
+        self._setData("cds", cds_df)
+        self._saveData("cds")
+        cds_df = self._getData("cds")
+
+        print("Saving cds_to_bgc table...")
+        cds_bgc_df = RelationDF(joined.select(
+            F.col("idx").alias("idx_1"),
+            F.col("bgc_id").alias("idx_2")
+        ), sources = [cds_df, bgc_df])
         self._setData("cds_to_bgc", cds_bgc_df)
         self._saveData("cds_to_bgc")
         cds_bgc_df = self._getData("cds_to_bgc")
-
-        # filter only cds in bgcs, then save cdsDF
-        cds_df.df = cds_df.df.join(
-            cds_bgc_df.df.select("idx_1").distinct(),
-            [ cds_df.df.idx == cds_bgc_df.df.idx_1 ]
-        ).select(cds_df.df.columns)
-        self._setData("cds", cds_df)
-        self._saveData("cds")
-
-        # now that cdsDF is filtered and stored properly,
-        # update only the metadata of cds_to_bgc DF
-        cds_bgc_df.updateSources([cds_df, bgc_df])
-        self._saveData("cds_to_bgc", overwrite=True)
 
     def _loadExtraData(self):
         return
@@ -78,6 +79,7 @@ class BigsliceApp(AxlApp):
         spark, sc = get_spark_session_and_context()
 
         # first, read bigslice_db folder to get the unique db ids
+        print("checking bigslice_db folder...")
         biopfam_md5, subpfam_md5 = scan_bigslice_db_folder(bigslice_db_path)
 
         # fetch current bgc, cds and cds_to_bgc ids
@@ -108,6 +110,7 @@ class BigsliceApp(AxlApp):
                 biopfam_md5
             ))
             if not check_file_exists(biopfam_pq_path):
+                print("running biopfam-scan...")
                 # run biopfam scan and save parquet
                 biopfam_model_path = path.join(
                     bigslice_db_path, "biosynthetic_pfams", "Pfam-A.biosynthetic.hmm"
@@ -125,6 +128,7 @@ class BigsliceApp(AxlApp):
                 biopfam_md5, subpfam_md5
             ))
             if not check_file_exists(subpfam_pq_path):
+                print("running subpfam-scan...")
                 biopfam_scan_df = spark.read.parquet(biopfam_pq_path)
                 with open(path.join(bigslice_db_path, "sub_pfams", "corepfam.tsv")) as file_stream:
                     file_stream.readline()
@@ -230,6 +234,7 @@ class BigsliceApp(AxlApp):
             # ------------------------------------------------------
             # | 0      | { "PKS_KS:1": 255, "PKS_KS:5": 155, ... } |
             # ------------------------------------------------------
+            print("calculating feature vectors...")
             feature_df = biopfam_feat_df.join(subpfam_feat_df, "bgc_id", "outer").select(
                 F.col("bgc_id"),
                 F.udf(
