@@ -70,13 +70,11 @@ class bgcDF(ioDF):
         return True
 
     @classmethod
-    def fromRawFeatDF(cls, features: RawFeatDF, sequences: NuclSeqDF=None, source_type: str="antismash", reindex: bool=True):
+    def fromRawFeatDF(cls, features: RawFeatDF, source_type: str="antismash", reindex: bool=True):
         """
         the primary class method to use for generating a bgcDF given a previously-parsed RawFeatDF. By default, it will parse
         for antiSMASH-type BGCs (encoded as a "region" in the gbk file). Use source_type == "smc" if the BGC features come
-        from the SMC database's (https://smc.jgi.doe.gov/) GFF3 files. When a NuclSeqDF is also supplied, Axolotl will also
-        extract the nucleotide sequences information of each BGC, along with the "on_contig_edge" status (if it was not set
-        before, such as the case of SMC BGCs).
+        from the SMC database's (https://smc.jgi.doe.gov/) GFF3 files.
 
         By default, the resulting bgcDF will have its own 'idx' recalculated (reindex=True).
         """
@@ -108,40 +106,53 @@ class bgcDF(ioDF):
                     "on_contig_edge" : None,
                     "other_qualifiers" : [q for q in row.qualifiers if q.key not in ["BGC_Class", "contig_edge"]]
             }).toDF(cls.getSchema()).filter((F.size(F.col("classes")) > 0)) # to exclude 'cluster' features that are not a BGC
+
+        else:
+            raise Exception("unrecognized source_type: '{}'".format(source_type))
+
+        return cls(df, override_idx=reindex, keep_idx=(not reindex), sources=[features])
                 
-        if sequences is None:
-            # return as is
-            return cls(df, override_idx=reindex, keep_idx=(not reindex), sources=[features])
-        else: 
-            # given sequences df, also try grab nt_sequence data
-            bgcs_lists = df.groupBy(["source_path", "seq_id"]).agg(
-                F.collect_list("idx").alias("row_ids"),
-                F.collect_list("location").alias("locations")
-            )
-            joined = bgcs_lists.join(sequences.df, [
-                bgcs_lists.source_path == sequences.df.file_path, bgcs_lists.seq_id == sequences.df.seq_id
-            ]).select(
-                sequences.df.sequence, bgcs_lists.row_ids, bgcs_lists.locations
-            )
-            bgc_sequences = joined.rdd.flatMap(
-                lambda row: zip(row["row_ids"], [len(row["sequence"])]*len(row["locations"]), [
-                    str(NuclSeqDF.fetch_seq(row["sequence"], loc)) for i, loc in enumerate(row["locations"])
-                ])
-            ).toDF(T.StructType([
-                T.StructField("idx", T.LongType()),
-                T.StructField("contig_nt_length", T.LongType()),
-                T.StructField("seq", T.StringType())
-            ]))
-            joined = df.join(bgc_sequences, "idx", "left").withColumn(
-                "nt_seq",
-                F.when(F.lit(True), bgc_sequences.seq)
-            )
-            if source_type in ["smc"]:
-                # also calculate contig edges
-                joined = joined.withColumn(
-                    "on_contig_edge",
-                    F.when(F.lit(True),
-                        F.when(joined.contig_nt_length <= joined.location.end, F.lit(True)).otherwise(F.lit(False))
-                    )
+
+    def fillSeqInfo(self, sequences: NuclSeqDF, check_contig_edges: bool=False):
+        """
+        When a NuclSeqDF is also supplied, Axolotl will exract the nucleotide sequences information
+        of each BGC, along with the "on_contig_edge" status (if check_contig_edges=True).
+        """
+
+        df = self.df
+        bgcs_lists = df.groupBy(["source_path", "seq_id"]).agg(
+            F.collect_list("idx").alias("row_ids"),
+            F.collect_list("location").alias("locations")
+        )
+        joined = bgcs_lists.join(sequences.df, [
+            bgcs_lists.source_path == sequences.df.file_path, bgcs_lists.seq_id == sequences.df.seq_id
+        ]).select(
+            sequences.df.sequence, bgcs_lists.row_ids, bgcs_lists.locations
+        )
+        bgc_sequences = joined.rdd.flatMap(
+            lambda row: zip(row["row_ids"], [len(row["sequence"])]*len(row["locations"]), [
+                str(NuclSeqDF.fetch_seq(row["sequence"], loc)) for i, loc in enumerate(row["locations"])
+            ])
+        ).toDF(T.StructType([
+            T.StructField("idx", T.LongType()),
+            T.StructField("contig_nt_length", T.LongType()),
+            T.StructField("seq", T.StringType())
+        ]))
+        joined = df.join(bgc_sequences, "idx", "left").withColumn(
+            "nt_seq",
+            F.when(F.lit(True), bgc_sequences.seq)
+        )
+        if check_contig_edges:
+            # fill contig edges information
+            joined = joined.withColumn(
+                "on_contig_edge",
+                F.when(F.lit(True),
+                    F.when(joined.contig_nt_length <= joined.location.end, F.lit(True)).otherwise(F.lit(False))
                 )
-            return cls(joined.select(df.columns), override_idx=reindex, keep_idx=(not reindex), sources=[features, sequences])
+            )
+        df = joined.select(self.__class__.getSchema().fieldNames())
+        
+        new_obj = self.__class__(joined, override_idx=False, keep_idx=True)
+        new_obj.updateSourcesByIds([self._sources[0], sequences._id])
+
+        return new_obj

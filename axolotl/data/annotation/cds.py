@@ -143,11 +143,12 @@ class cdsDF(ioDF):
             T.StructField("seq", T.StringType())
         ]))
 
-        orig_columns = cds_df.columns
-        self.df = cds_df.join(translated, "idx", "left").withColumn(
+        df = cds_df.join(translated, "idx", "left").withColumn(
             "aa_sequence",
             F.when(cds_df.aa_sequence.isNotNull(), cds_df.aa_sequence).otherwise(translated.seq)
-        ).select(orig_columns)
-        self._sources = [self._sources[0], sequences._id]
+        ).select(self.__class__.getSchema().fieldNames())
 
-        return self
+        new_obj = self.__class__(df, override_idx=False, keep_idx=True)
+        new_obj.updateSourcesByIds([self._sources[0], sequences._id])
+
+        return new_obj
