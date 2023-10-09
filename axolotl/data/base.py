@@ -113,6 +113,14 @@ class AxlDF(ABC):
         """
         self._sources = [source._id for source in sources]
 
+    def updateSourcesByIds(self, source_ids: List):
+        """
+        update the _sources attribute post object instantiation,
+        directly supplying the IDs (e.g. in case the original AxlDF
+        object is not available)
+        """
+        self._sources = source_ids
+
     @classmethod
     def getSchema(cls) -> T.StructType():
         """
