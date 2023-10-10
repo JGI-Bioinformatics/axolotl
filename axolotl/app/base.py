@@ -107,22 +107,24 @@ class AxlApp:
         self._metadata = metadata
 
     @classmethod
-    def getOrCreate(cls, app_folder_path: str, *args, **kwargs):
+    def create(cls, app_folder_path: str, *args, **kwargs):
         """
         the main entry point for creating a new AxlApp object. given a specific path, Axolotl will
-        either load the previously-stored app data (if folder exists) or create and save a new app
-        object.
+        create and save a new app by calling the subclass's _creationFunc() function.
+        """
 
-        Don't inherit this method directly, instead apply your subclass-specific logic in the _create()
-        method.
+        app_object = cls.__createAndSave(app_folder_path, *args, **kwargs)        
+        return app_object
+
+    @classmethod
+    def load(cls, app_folder_path: str):
+        """
+        load the previously-stored app
         """
 
         app_object = cls.__loadFolder(app_folder_path)
         if not app_object:
-            print("can't load  from folder, creating a new object")
-            app_object = cls.__createAndSave(app_folder_path, *args, **kwargs)        
-        if not app_object:
-            raise Exception("failed to load or create object")
+            raise TypeError("can't load  from folder!! {}".format(app_folder_path))
         return app_object
 
     def getData(self, key: str):
