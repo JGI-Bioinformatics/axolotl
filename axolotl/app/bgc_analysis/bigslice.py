@@ -156,7 +156,18 @@ class BigsliceApp(AxlApp):
                         bit_cutoff=20,
                         use_unoptimized_hmm=True
                     )
-                ).toDF().select("query_name", "hmm_name", "bitscore")\
+                ).toDF(T.StructType([
+                    T.StructField("query_name", T.StringType()),
+                    T.StructField("query_from", T.LongType()),
+                    T.StructField("query_to", T.LongType()),
+                    T.StructField("query_gaps", T.ArrayType(T.LongType())),
+                    T.StructField("hmm_acc", T.StringType()),
+                    T.StructField("hmm_name", T.StringType()),
+                    T.StructField("hmm_from", T.LongType()),
+                    T.StructField("hmm_to", T.LongType()),
+                    T.StructField("hmm_gaps", T.ArrayType(T.LongType())),
+                    T.StructField("bitscore", T.FloatType())
+                ])).select("query_name", "hmm_name", "bitscore")\
                     .withColumn(
                         "corepfam", F.udf(lambda name: name.split(".aligned_c")[0], T.StringType())("hmm_name")
                     )\
