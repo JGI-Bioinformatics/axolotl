@@ -194,45 +194,6 @@ class prs_calc_App(AxlApp):
     for idx, sample_name in enumerate(sample_names):
       new_vcf_df= new_vcf_df.withColumn(sample_name, F.col("samples").getItem(idx))
     return new_vcf_df
-  
-
-  def make_samples_df_with_vcfDF(self, metadata_df, vcf_df):
-    """
-    Extracts sample names from the 'metadata_df' and creates new columns in 'vcf_df' 
-    for each sample. Each new column is populated with values extracted from the 
-    "samples" column of 'vcf_df' based on the index of the sample name.
-    """
-    sample_names=metadata_df.filter(metadata_df.key == "samples").select("value").collect()[0][0]
-    sample_names=sample_names.split("\t")
-    new_vcf_df = vcf_df
-    for idx, sample_name in enumerate(sample_names):
-      new_vcf_df.df= new_vcf_df.df.withColumn(sample_name, F.col("samples").getItem(idx))
-    return new_vcf_df
-  
-  def make_samples_df_with_vcfDF_inplace(self, metadata_df, vcf_df):
-    """
-    Extracts sample names from the 'metadata_df' and creates new columns in 'vcf_df' 
-    for each sample. Each new column is populated with values extracted from the 
-    "samples" column of 'vcf_df' based on the index of the sample name.
-    """
-    sample_names=metadata_df.filter(metadata_df.key == "samples").select("value").collect()[0][0]
-    sample_names=sample_names.split("\t")
-    for idx, sample_name in enumerate(sample_names):
-      vcf_df.df = vcf_df.df.withColumn(sample_name, F.col("samples").getItem(idx))
-
-
-  def make_samples_df_with_vcfDF_return_df(self, metadata_df, vcf_df):
-    """
-    Extracts sample names from the 'metadata_df' and creates new columns in 'vcf_df' 
-    for each sample. Each new column is populated with values extracted from the 
-    "samples" column of 'vcf_df' based on the index of the sample name.
-    """
-    sample_names=metadata_df.filter(metadata_df.key == "samples").select("value").collect()[0][0]
-    sample_names=sample_names.split("\t")
-    new_vcf_df = vcf_df.df
-    for idx, sample_name in enumerate(sample_names):
-      new_vcf_df= new_vcf_df.df.withColumn(sample_name, F.col("samples").getItem(idx))
-    return new_vcf_df
 
 
 
@@ -296,6 +257,7 @@ class prs_calc_App(AxlApp):
     +------+---------+----+----+-----------+
 
     """
+  
     vsf_folder = os.path.join(
             self._folder_path, "vsf",
             "{}-{}".format(
