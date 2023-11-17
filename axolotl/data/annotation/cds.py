@@ -75,9 +75,12 @@ class cdsDF(ioDF):
         use BioPython's Seq.translate() function to translate a snippet of a nucleotide sequence
         given a standard translation table.
         """
-        return str(
-            Seq(seq, generic_dna).translate(table=transl_table if transl_table else "Standard")
-        ).rstrip("*")
+        if transl_table == -1:
+            return None
+        else:
+            return str(
+                Seq(seq, generic_dna).translate(table=transl_table if transl_table else "Standard")
+            ).rstrip("*")
 
     @classmethod
     def fromRawFeatDF(cls, features: RawFeatDF, reindex: bool=True):
