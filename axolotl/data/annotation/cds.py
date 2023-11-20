@@ -2,6 +2,7 @@ import pyspark.sql.functions as F
 import pyspark.sql.types as T
 from pyspark.sql import Row
 from Bio.Seq import Seq
+from Bio.Alphabet import generic_dna
 
 from axolotl.data import ioDF
 from axolotl.data.annotation.base import RawFeatDF
@@ -74,12 +75,12 @@ class cdsDF(ioDF):
         use BioPython's Seq.translate() function to translate a snippet of a nucleotide sequence
         given a standard translation table.
         """
-        try:
-            return str(
-                Seq.translate(seq, transl_table if transl_table else "Standard")
-            ).rstrip("*")
-        except:
+        if transl_table == -1:
             return None
+        else:
+            return str(
+                Seq(seq, generic_dna).translate(table=transl_table if transl_table else "Standard")
+            ).rstrip("*")
 
     @classmethod
     def fromRawFeatDF(cls, features: RawFeatDF, reindex: bool=True):
