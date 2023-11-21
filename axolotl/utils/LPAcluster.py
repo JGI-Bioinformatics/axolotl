@@ -4,6 +4,8 @@ Support for both weighted and unweighted LPA
 
 Usage Example:
 
+from axolotl.utils.vae import LPAcluster import *
+
 vertex_df = load_data(input_path, input_type="TSV" )
 edge_df = edge_gen(vertex_df, min_cs= .7)
 lpa_cluster(vertex_df,

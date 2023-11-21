@@ -4,7 +4,10 @@
 Support for multi-layers, returns an encoder to encode new samples, and a generator to predict based on encodings
 
 ## Usage Example:
-  # X is a pandas dataframe, with its first column is id/labels and the rest of the columns features
+  from sklearn.model_selection import train_test_split
+  from axolotl.utils.vae import vae_nlayers
+
+  # input_data is a pandas dataframe, with its first column is id/labels and the rest of the columns features
   X = input_data.values[:,1:]
   y = input_data.values[:,0]
   x_train, x_test, y_train, y_test = train_test_split(X, y, test_size=.5, random_state=321)
@@ -58,7 +61,7 @@ def vae_nlayers(
   epsilon_std=1.0,
   print_model_structure=False
 ):
-
+  X = np.vstack((x_train, x_test))
   x_train = x_train.astype('float32') / np.max(X)
   x_test = x_test.astype('float32') / np.max(X)
   x_train = x_train.reshape((len(x_train), np.prod(x_train.shape[1:])))
