@@ -33,7 +33,7 @@ setuptools.setup(
     test_suite="tests",
     install_requires=[
         "pyspark",
-        "biopython",
+        "biopython<=1.77",
         "pyhmmer"
     ],
     tests_require=[
