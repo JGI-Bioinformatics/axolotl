@@ -34,7 +34,11 @@ setuptools.setup(
     install_requires=[
         "pyspark",
         "biopython<=1.77",
-        "pyhmmer"
+        "pyhmmer",
+        "scikit-learn",
+        "numpy",
+        "pandas",
+        "tqdm"
     ],
     tests_require=[
     ],
