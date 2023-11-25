@@ -2,10 +2,14 @@ from typing import List, Tuple, Dict
 from pyhmmer.hmmer import hmmscan as pyhmmscan
 from pyhmmer.plan7 import HMMFile
 from pyhmmer.easel import TextSequence, Alphabet
+from sklearn.cluster import Birch
+from sklearn.preprocessing import normalize
+import pandas as pd
 from os import path
+from glob import iglob
 import warnings
 
-from pyspark.sql import DataFrame
+from pyspark.sql import DataFrame, Row
 import pyspark.sql.types as T
 import pyspark.sql.functions as F
 
@@ -24,6 +28,23 @@ def scan_bigslice_db_folder(bigslice_db_path: str):
     with fopen(subpfam_md5_path, "r") as file_stream:
         subpfam_md5 = file_stream.read().rstrip("\n")
     return (biopfam_md5, subpfam_md5)
+
+
+def get_bigslice_features_column(bigslice_model_path: str):
+    all_models = []
+    # first, get all biosyn pfam models
+    with open(path.join(bigslice_model_path, "biosynthetic_pfams", "Pfam-A.biosynthetic.hmm"), "r") as ii:
+        for line in ii:
+            if line.startswith("ACC "):
+                all_models.append(line.rstrip("\n").split()[1])
+    # then, get all subpfam models
+    for subpfam_hmm in iglob(path.join(bigslice_model_path, "sub_pfams", "hmm", "*.hmm")):
+        with open(subpfam_hmm, "r") as ii:
+            for line in ii:
+                if line.startswith("NAME "):
+                    core_name, subpfam_number = (line.rstrip("\n").split()[1].split(".aligned_c"))
+                    all_models.append("{}:{}".format(core_name, subpfam_number))
+    return sorted(all_models)
 
 
 def run_hmmscan(sequences: List[Tuple], hmm_db_path: str, num_cpus: int=1,
@@ -95,3 +116,71 @@ def scan_cdsDF(cds_df: cdsDF, hmm_db_path: str, num_cpus: int=1,
     )
 
     return result_df
+
+
+def calc_bigslice_gcfs(
+    input_df: DataFrame, bigslice_model_path: str, threshold: float,
+    use_cosine: bool=False
+):
+    """
+    Calculate GCF centroids from BiG-SLiCE BGC vectors using Birch
+    clustering algorithm. This function will take the pySpark DataFrame
+    of the vectors, then perform a "mini-batch" approach on the Birch
+    clustering algorithm, dividing the input DataFrame into partitions
+    and calculate GCF features for each partition separately.
+    
+    # input_df schema: idx (int), features (dict[string, int/float])
+    # output df schema: idx (int), features(dict[string, float])
+    """
+    
+    # first, get column headers information
+    bigslice_vector_columns = get_bigslice_features_column(bigslice_model_path)
+    
+    def get_pandas_df_from_vectors(
+        rows: List[Row], column_headers: List[str], vector_type:str="dict"
+    ) -> pd.DataFrame:
+        """
+        Function to convert the original batch of pySpark DataFrame rows
+        into Pandas DataFrame for sklearn processing
+        """
+    
+        if vector_type == "dict":
+            return pd.DataFrame.from_records(
+                [row.features for row in rows],
+                index=[row.idx for row in rows],
+                columns=column_headers
+            ).fillna(0).astype(int)
+        else:
+            raise Exception("vector type '{}' not supported.".format(vector_type))
+    
+    def run_birch(rows):
+        """
+        Function to call Birch clustering per partition
+        """
+        pandas_df = get_pandas_df_from_vectors(list(rows), bigslice_vector_columns)
+        if use_cosine:
+            pandas_df = normalize(pandas_df, norm="l2")
+        clusterer = Birch(
+            threshold=0.4,
+            branching_factor=pandas_df.shape[0],
+            compute_labels=False,
+            n_clusters=None
+        )
+        clusterer.fit(pandas_df)
+        return clusterer.subcluster_centers_
+    
+    # run gcf calculation in Spark
+    gcf_features = input_df.select(
+        F.col("bgc_id").alias("idx"), F.col("features")
+    ).rdd.mapPartitions(run_birch)
+    gcf_features = gcf_features.map(
+        lambda vector: [pd.Series(vector, index=bigslice_vector_columns)[vector > 0].to_dict()]
+    )
+    gcf_features = gcf_features.toDF(T.StructType([
+        T.StructField("features", T.MapType(T.StringType(), T.FloatType()))
+    ])).select(
+        F.monotonically_increasing_id().alias("gcf_id"),
+        F.col("features")
+    )
+    
+    return gcf_features
