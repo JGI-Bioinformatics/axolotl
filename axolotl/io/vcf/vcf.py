@@ -8,6 +8,7 @@ from axolotl.data import MetaDF
 from abc import abstractmethod
 from typing import Dict
 from axolotl.data import ioDF
+from os import path
 
 class vcfMetaIO(AxlIO):
         
