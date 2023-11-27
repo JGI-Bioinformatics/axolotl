@@ -9,6 +9,7 @@ from abc import abstractmethod
 from typing import Dict
 from axolotl.data import ioDF
 from os import path
+from axolotl.utils.file import fopen
 
 class vcfMetaIO(AxlIO):
         
