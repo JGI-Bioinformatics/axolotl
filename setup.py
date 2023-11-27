@@ -33,6 +33,7 @@ setuptools.setup(
     test_suite="tests",
     install_requires=[
         "pyspark",
+        "pyarrow",
         "biopython<=1.77",
         "pyhmmer",
         "scikit-learn",
