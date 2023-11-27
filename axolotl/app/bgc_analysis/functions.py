@@ -129,8 +129,8 @@ def calc_bigslice_gcfs(
     clustering algorithm, dividing the input DataFrame into partitions
     and calculate GCF features for each partition separately.
     
-    # input_df schema: idx (int), features (dict[string, int/float])
-    # output df schema: idx (int), features(dict[string, float])
+    # input_df schema: bgc_id (int), features (dict[string, int/float])
+    # output df schema: gcf_id (int), features(dict[string, float])
     """
     
     # first, get column headers information
@@ -161,7 +161,7 @@ def calc_bigslice_gcfs(
         if use_cosine:
             pandas_df = normalize(pandas_df, norm="l2")
         clusterer = Birch(
-            threshold=0.4,
+            threshold=threshold,
             branching_factor=pandas_df.shape[0],
             compute_labels=False,
             n_clusters=None
