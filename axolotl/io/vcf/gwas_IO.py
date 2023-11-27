@@ -1,6 +1,7 @@
 from itertools import chain
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
+from axolotl.utils.spark import get_spark_session_and_context
 
 # preprocess gwas files
 
@@ -12,6 +13,8 @@ def gwas_csv_input(gwas, output=''):
       gwas (_string_): _gwas input file in csv format_
       output (_string_): _output file_, if empty, return the dataframe
   """
+
+  spark,sc = get_spark_session_and_context()
 
   #make a mapping dictionary
   mapping = {
