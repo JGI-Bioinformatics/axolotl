@@ -119,8 +119,7 @@ def scan_cdsDF(cds_df: cdsDF, hmm_db_path: str, num_cpus: int=1,
 
 
 def calc_bigslice_gcfs(
-    input_df: DataFrame, bigslice_model_path: str, threshold: float,
-    use_cosine: bool=False
+    input_df: DataFrame, bigslice_model_path: str, threshold: float
 ):
     """
     Calculate GCF centroids from BiG-SLiCE BGC vectors using Birch
@@ -158,8 +157,6 @@ def calc_bigslice_gcfs(
         Function to call Birch clustering per partition
         """
         pandas_df = get_pandas_df_from_vectors(list(rows), bigslice_vector_columns)
-        if use_cosine:
-            pandas_df = normalize(pandas_df, norm="l2")
         clusterer = Birch(
             threshold=threshold,
             branching_factor=pandas_df.shape[0],
