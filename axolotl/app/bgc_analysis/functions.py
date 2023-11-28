@@ -182,3 +182,20 @@ def calc_bigslice_gcfs(
     )
     
     return gcf_features
+
+
+def apply_l2_norm(input_df: DataFrame) -> DataFrame:
+    """
+    apply l2 normalization to a features DataFrame
+
+    input_df schema: idx (int), features (dict[string, int/float])
+    output df schema: idx (int), features(dict[string, float])
+    """
+
+    def norm_feature(feature: dict):
+        divider = sqrt(sum([val**2 for val in feature.values()]))
+        return {key: val/divider for key, val in feature.items()}
+
+    l2_normalize = F.udf(lambda features: norm_feature(features), T.MapType(T.StringType(), T.FloatType()))
+    
+    return input_df.select(F.col("idx"), l2_normalize(F.col("features")).alias("features"))
