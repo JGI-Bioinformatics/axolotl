@@ -110,17 +110,6 @@ class prs_calc_App(AxlApp):
 
 
 
-  # table to replace chromosome numbering. Used for update_chromosome function.
-  mapping = {
-  'X': 23,
-  'Y': 24,
-  'M': 25
-  }
-  mapping.update({str(i+1):(i+1) for i in range(25)})
-  chr_mapping = F.create_map([F.lit(x) for x in chain(*mapping.items())])
-
-
-
   def update_chromosome(self,vcf_df): 
     """
     Input:Dataframe with a column called "chromosome"
@@ -129,7 +118,16 @@ class prs_calc_App(AxlApp):
     Ex: NC_000007.13 -> 7 or NC_000008.10 -> 8
 
     """
+    # table to replace chromosome numbering. Used for update_chromosome function.
+    mapping = {
+    'X': 23,
+    'Y': 24,
+    'M': 25
+    }
+    mapping.update({str(i+1):(i+1) for i in range(25)})
+    chr_mapping = F.create_map([F.lit(x) for x in chain(*mapping.items())])
 
+    
     new_vcf_df=vcf_df.withColumnRenamed("chromosome", "old_chromosome").withColumn("chromosome", F.regexp_extract(F.col("old_chromosome"), r'NC_0+(\d+).|(?:1\d?|2[0-5]?)', 1))
     new_vcf_df=new_vcf_df.withColumn('chromosome', chr_mapping[new_vcf_df['chromosome']])
     return new_vcf_df
