@@ -9,6 +9,7 @@ from axolotl.io.vcf import vcfDataIO, vcfMetaIO
 from axolotl.data.vcf import vcfDF
 from axolotl.data import MetaDF
 from axolotl.utils.file import check_file_exists, is_directory, parse_path_type, get_temp_dir, make_dirs
+from axolotl.utils.spark import get_spark_session_and_context
 
 from itertools import chain
 from typing import Dict
@@ -43,6 +44,7 @@ class prs_calc_App(AxlApp):
     Create function is used to create the app and also collect your inputs. It is also responsible for saving intermediates of your inputs into the app folder. 
 
     """
+    spark, sc = get_spark_session_and_context()
 
 
     self._setData("vcf_metadata", vcf_metadata_df)
@@ -94,6 +96,7 @@ class prs_calc_App(AxlApp):
     """
     This is here to load the Dataframes you create in the create function. We used _dataDesc to hold all AxlDFs. This is only stuff you need initially at the start of your pipeline that don't already have a function that takes care of reading in the data. In our case Calc_PRS. 
     """
+    spark, sc = get_spark_session_and_context()
 
     app_loc=self._folder_path
 
@@ -347,7 +350,7 @@ class prs_calc_App(AxlApp):
       
       gt.write.mode('overwrite').parquet(vsf_folder)
 
-
+    spark, sc = get_spark_session_and_context()
     return spark.read.parquet(vsf_folder)
 
 
@@ -472,6 +475,7 @@ class prs_calc_App(AxlApp):
       if output != '':
         results.to_pandas_on_spark().to_pandas().to_csv(output, index=False, header=True, sep='\t')
     
+    spark, sc = get_spark_session_and_context()
     return spark.read.parquet(results_folder)
 
 
