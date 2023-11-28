@@ -149,11 +149,11 @@ def calc_bigslice_gcfs(
                 [row.features for row in rows],
                 index=[row.idx for row in rows],
                 columns=column_headers
-            ).fillna(0).astype(int)
+            ).fillna(0)
         else:
             raise Exception("vector type '{}' not supported.".format(vector_type))
     
-    def run_birch(rows):
+    def run_birch(rows, threshold):
         """
         Function to call Birch clustering per partition
         """
@@ -170,7 +170,7 @@ def calc_bigslice_gcfs(
     # run gcf calculation in Spark
     gcf_features = input_df.select(
         F.col("bgc_id").alias("idx"), F.col("features")
-    ).rdd.mapPartitions(run_birch)
+    ).rdd.mapPartitions(lambda rows: run_birch(rows, threshold))
     gcf_features = gcf_features.map(
         lambda vector: [pd.Series(vector, index=bigslice_vector_columns)[vector > 0].to_dict()]
     )
@@ -184,12 +184,14 @@ def calc_bigslice_gcfs(
     return gcf_features
 
 
-def apply_l2_norm(input_df: DataFrame) -> DataFrame:
+def apply_l2_norm(input_df: DataFrame, idx_colname: str="idx") -> DataFrame:
     """
     apply l2 normalization to a features DataFrame
 
     input_df schema: idx (int), features (dict[string, int/float])
     output df schema: idx (int), features(dict[string, float])
+
+    use idx_colname to change the default 'idx' colname to something else
     """
 
     def norm_feature(feature: dict):
@@ -198,4 +200,4 @@ def apply_l2_norm(input_df: DataFrame) -> DataFrame:
 
     l2_normalize = F.udf(lambda features: norm_feature(features), T.MapType(T.StringType(), T.FloatType()))
     
-    return input_df.select(F.col("idx"), l2_normalize(F.col("features")).alias("features"))
+    return input_df.select(F.col(idx_colname), l2_normalize(F.col("features")).alias("features"))
