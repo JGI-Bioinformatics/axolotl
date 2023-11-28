@@ -7,6 +7,7 @@ from sklearn.preprocessing import normalize
 import pandas as pd
 from os import path
 from glob import iglob
+from math import sqrt
 import warnings
 
 from pyspark.sql import DataFrame, Row
