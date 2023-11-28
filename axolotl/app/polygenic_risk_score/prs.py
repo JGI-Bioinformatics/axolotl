@@ -258,7 +258,8 @@ class prs_calc_App(AxlApp):
     +------+---------+----+----+-----------+
 
     """
-  
+    spark, sc = get_spark_session_and_context()
+
     vsf_folder = os.path.join(
             self._folder_path, "vsf",
             "{}-{}".format(
@@ -350,7 +351,7 @@ class prs_calc_App(AxlApp):
       
       gt.write.mode('overwrite').parquet(vsf_folder)
 
-    spark, sc = get_spark_session_and_context()
+    
     return spark.read.parquet(vsf_folder)
 
 
