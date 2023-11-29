@@ -36,7 +36,9 @@ class vcfMetaIO(AxlIO):
     @classmethod
     def _prepInput(cls, file_path:str, tmp_dir:str) -> str:
         
-        temp_file = path.join(tmp_dir, "temp.vcf")
+        #temp_file = path.join(tmp_dir, "temp.vcf")
+        #tmp_dir is buggy when worker nodes can't access driver node tmp folder. 
+        temp_file = file_path + ".axl_temp_metadata"
         
         with fopen(file_path, "r") as ii:
             with fopen(temp_file, "w") as oo:
