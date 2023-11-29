@@ -7,6 +7,7 @@ from sklearn.preprocessing import normalize
 import pandas as pd
 from os import path
 from glob import iglob
+from math import sqrt
 import warnings
 
 from pyspark.sql import DataFrame, Row
@@ -119,8 +120,7 @@ def scan_cdsDF(cds_df: cdsDF, hmm_db_path: str, num_cpus: int=1,
 
 
 def calc_bigslice_gcfs(
-    input_df: DataFrame, bigslice_model_path: str, threshold: float,
-    use_cosine: bool=False
+    input_df: DataFrame, bigslice_model_path: str, threshold: float
 ):
     """
     Calculate GCF centroids from BiG-SLiCE BGC vectors using Birch
@@ -149,17 +149,15 @@ def calc_bigslice_gcfs(
                 [row.features for row in rows],
                 index=[row.idx for row in rows],
                 columns=column_headers
-            ).fillna(0).astype(int)
+            ).fillna(0)
         else:
             raise Exception("vector type '{}' not supported.".format(vector_type))
     
-    def run_birch(rows):
+    def run_birch(rows, threshold):
         """
         Function to call Birch clustering per partition
         """
         pandas_df = get_pandas_df_from_vectors(list(rows), bigslice_vector_columns)
-        if use_cosine:
-            pandas_df = normalize(pandas_df, norm="l2")
         clusterer = Birch(
             threshold=threshold,
             branching_factor=pandas_df.shape[0],
@@ -172,7 +170,7 @@ def calc_bigslice_gcfs(
     # run gcf calculation in Spark
     gcf_features = input_df.select(
         F.col("bgc_id").alias("idx"), F.col("features")
-    ).rdd.mapPartitions(run_birch)
+    ).rdd.mapPartitions(lambda rows: run_birch(rows, threshold))
     gcf_features = gcf_features.map(
         lambda vector: [pd.Series(vector, index=bigslice_vector_columns)[vector > 0].to_dict()]
     )
@@ -184,3 +182,22 @@ def calc_bigslice_gcfs(
     )
     
     return gcf_features
+
+
+def apply_l2_norm(input_df: DataFrame, idx_colname: str="idx") -> DataFrame:
+    """
+    apply l2 normalization to a features DataFrame
+
+    input_df schema: idx (int), features (dict[string, int/float])
+    output df schema: idx (int), features(dict[string, float])
+
+    use idx_colname to change the default 'idx' colname to something else
+    """
+
+    def norm_feature(feature: dict):
+        divider = sqrt(sum([val**2 for val in feature.values()]))
+        return {key: val/divider for key, val in feature.items()}
+
+    l2_normalize = F.udf(lambda features: norm_feature(features), T.MapType(T.StringType(), T.FloatType()))
+    
+    return input_df.select(F.col(idx_colname), l2_normalize(F.col("features")).alias("features"))
