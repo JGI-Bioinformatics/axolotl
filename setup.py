@@ -1,11 +1,5 @@
 import setuptools
 
-with open('README.rst') as readme_file:
-    readme = readme_file.read()
-
-with open('HISTORY.rst') as history_file:
-    history = history_file.read()
-
 setuptools.setup(
     name="axolotl",
     version="0.2.0",
@@ -14,8 +8,8 @@ setuptools.setup(
     ],
     author="Joint Genome Institute - Genome Analysis R&D",
     author_email="zhongwang@lbl.gov",
-    description=("A Python PGenomics Library based on pySpark"),
-    long_description=readme + '\n\n' + history,
+    description=("A Python Genomics Library based on pySpark"),
+    long_description="",
     url="https://github.com/zhongwang/axolotl",
     packages=setuptools.find_packages(),
     include_package_data=True,
@@ -28,6 +22,7 @@ setuptools.setup(
         'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',
+        'Programming Language :: Python :: 3.11',
     ],
     python_requires=">=3.6",
     test_suite="tests",
