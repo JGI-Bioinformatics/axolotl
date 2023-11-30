@@ -1,4 +1,7 @@
-package org.jgi.spark.udf;
+package org.jgi.axolotl.udfs;
+
+
+import org.jgi.axolotl.libs.*;
 import org.apache.spark.sql.api.java.UDF1;
 
 /*  calGC was from Brain Bushnell's quick implementation

@@ -1,4 +1,5 @@
-package org.jgi.spark.udf;
+package org.jgi.axolotl.udfs;
+
 /*
  
 # Example usage:
@@ -19,6 +20,7 @@ input_seq.show(2, truncate=False, vertical=True)
  */
 
 
+import org.jgi.axolotl.libs.*;
 import org.apache.spark.sql.api.java.UDF1;
 
 public class meanQuality implements UDF1<String, Double> {

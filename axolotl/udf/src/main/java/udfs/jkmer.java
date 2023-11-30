@@ -1,4 +1,4 @@
-package org.jgi.spark.udf;
+package org.jgi.axolotl.udfs;
 
 /*  jkmer was from Brain Bushnell's quick implementation
 
@@ -21,6 +21,7 @@ input_seq = spark.sql(sql_cmd)
 
 */
 
+import org.jgi.axolotl.libs.*;
 import org.apache.spark.sql.api.java.UDF3;
 
 public class jkmer implements UDF3<String, Integer, Integer, long[]> {

@@ -1,4 +1,4 @@
-package org.jgi.spark.udf;
+package org.jgi.axolotl.libs;
 
 import java.util.Arrays;
 
