@@ -129,8 +129,8 @@ def calc_bigslice_gcfs(
     clustering algorithm, dividing the input DataFrame into partitions
     and calculate GCF features for each partition separately.
     
-    # input_df schema: bgc_id (int), features (dict[string, int/float])
-    # output df schema: gcf_id (int), features(dict[string, float])
+    # input_df schema: features (dict[string, int/float])
+    # output df schema: idx (int), features(dict[string, float])
     """
     
     # first, get column headers information
@@ -147,7 +147,6 @@ def calc_bigslice_gcfs(
         if vector_type == "dict":
             return pd.DataFrame.from_records(
                 [row.features for row in rows],
-                index=[row.idx for row in rows],
                 columns=column_headers
             ).fillna(0)
         else:
@@ -168,16 +167,14 @@ def calc_bigslice_gcfs(
         return clusterer.subcluster_centers_
     
     # run gcf calculation in Spark
-    gcf_features = input_df.select(
-        F.col("bgc_id").alias("idx"), F.col("features")
-    ).rdd.mapPartitions(lambda rows: run_birch(rows, threshold))
+    gcf_features = input_df.select(F.col("features")).rdd.mapPartitions(lambda rows: run_birch(rows, threshold))
     gcf_features = gcf_features.map(
         lambda vector: [pd.Series(vector, index=bigslice_vector_columns)[vector > 0].to_dict()]
     )
     gcf_features = gcf_features.toDF(T.StructType([
         T.StructField("features", T.MapType(T.StringType(), T.FloatType()))
     ])).select(
-        F.monotonically_increasing_id().alias("gcf_id"),
+        F.monotonically_increasing_id().alias("idx"),
         F.col("features")
     )
     
