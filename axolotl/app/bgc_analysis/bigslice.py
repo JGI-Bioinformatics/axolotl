@@ -235,7 +235,7 @@ class BigsliceApp(AxlApp):
                 ))
                 dict_feat = {}
                 for (key, val) in merged_features:
-                    dict_feat[key] = max(val, dict_feat.get(key, 0))                
+                    dict_feat[key] = float(max(val, dict_feat.get(key, 0)))
                 return dict_feat
 
             # merge both biopfam features and subpfam features, then store feature df
@@ -249,7 +249,7 @@ class BigsliceApp(AxlApp):
             feature_df = biopfam_feat_df.join(subpfam_feat_df, "bgc_id", "outer").select(
                 F.col("bgc_id"),
                 F.udf(
-                    get_feature_vector, T.MapType(T.StringType(), T.IntegerType())
+                    get_feature_vector, T.MapType(T.StringType(), T.DoubleType())
                 )(F.col("biopfams"), F.col("subpfams")).alias("features")
             )
             feature_df.write.parquet(feature_pq_path)
