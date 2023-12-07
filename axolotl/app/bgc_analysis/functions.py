@@ -194,3 +194,45 @@ def apply_l2_norm(input_df: DataFrame, idx_colname: str="idx") -> DataFrame:
 
     activate_udf("L2Normalize", T.MapType(T.StringType(), T.DoubleType()))
     return input_df.select(idx_colname, F.expr("L2Normalize(features)").alias("features"))
+
+
+def get_gcf_membership(bgc_features, gcf_features):
+    """
+    Run NearestNeighbor calculation (euclidean) to match bgc to gcf
+
+    # bgc_features schema: bgc_id (int), features (dict[string, int/float])
+    # gcf_features schema: gcf_id (int), features (dict[string, int/float])
+    # output df schema: bgc_id (int), gcf_id (int), dist (float)
+    """
+    
+    bgc_features_partitioned = apply_l2_norm(bgc_features, "bgc_id").rdd.mapPartitions(
+        lambda rows: [[{row.bgc_id: row.features for row in rows}]]).toDF(
+        T.StructType([
+            T.StructField("bgc_features", T.MapType(T.LongType(), T.MapType(T.StringType(), T.DoubleType())))
+        ])
+    )
+
+    gcf_features_partitioned = gcf_features.rdd.mapPartitions(
+        lambda rows: [[{row.idx: row.features for row in rows}]]).toDF(
+        T.StructType([
+            T.StructField("gcf_features", T.MapType(T.LongType(), T.MapType(T.StringType(), T.DoubleType())))
+        ])
+    )
+    
+    activate_udf("NearestNeighbor", T.MapType(
+        T.LongType(),
+        T.StructType([
+            T.StructField("gcf_id", T.LongType()),
+            T.StructField("dist", T.DoubleType())
+        ])
+    ))
+
+    return bgc_features_partitioned.join(gcf_features_partitioned).select(
+        F.expr("NearestNeighbor(bgc_features, gcf_features)").alias("dists")
+    ).rdd.flatMap(lambda row: [[bgc_id, res.gcf_id, res.dist] for bgc_id, res in row.dists.items()]).toDF(
+        T.StructType([
+            T.StructField("bgc_id", T.LongType()),
+            T.StructField("gcf_id", T.LongType()),
+            T.StructField("dist", T.DoubleType())
+        ])
+    )

@@ -1,5 +1,5 @@
 # for udf sbt folder
-axolotl/udf
+axolotl/udf/*
 !axolotl/udf/src
 !axolotl/udf/build.sbt
 !axolotl/udf/README.md
