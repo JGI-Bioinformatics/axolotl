@@ -2,6 +2,7 @@ import pyspark.sql.functions as F
 import pyspark.sql.types as T
 from pyspark.sql import DataFrame
 from pyspark.mllib.linalg.distributed import IndexedRow, IndexedRowMatrix
+from pyspark.sql.types import ArrayType, StringType
 
 from axolotl.app.base import AxlApp
 from axolotl.io.vcf import vcfDataIO, vcfMetaIO
@@ -67,8 +68,18 @@ class prs_calc_App(AxlApp):
 
 
       current_vcf_data = vcf_vcf_df.df
-      current_vcf_data = self.make_samples_df(current_vcf_metadata,current_vcf_data)
+      missing_file_paths_list, full_sample_list = self.find_missing_samples_files(current_vcf_metadata)
+
+      if missing_file_paths_list == "0": 
+        current_vcf_data = self.make_samples_df(current_vcf_metadata,current_vcf_data)
+      elif missing_file_paths_list == "-1":
+        print("There is a missmatch in samples")
+        current_vcf_data = self.make_samples_df(current_vcf_metadata,current_vcf_data)
+      else: 
+        current_vcf_data = self.make_samples_df_fill_missing_samples(missing_file_paths_list, full_sample_list, current_vcf_metadata, current_vcf_data)
+      
       current_vcf_data = self.update_rsID(current_dbsnp_data,current_vcf_data)
+
 
       vcf_loc=self._folder_path
       vcf_loc=os.path.join(vcf_loc, "vcf_df_folder")
@@ -195,7 +206,77 @@ class prs_calc_App(AxlApp):
     for idx, sample_name in enumerate(sample_names):
       new_vcf_df= new_vcf_df.withColumn(sample_name, F.col("samples").getItem(idx))
     return new_vcf_df
+  
 
+
+  def find_missing_samples_files(self,metadata_df):
+    filtered_metadata_df = metadata_df.filter(metadata_df.key == "samples")
+
+    # Convert the 'value' column to an array of values
+    df_with_array = filtered_metadata_df.withColumn('array', F.split(F.col('value'), '\t'))
+
+    # Find the length of each array and the maximum length
+    df_with_length = df_with_array.withColumn('length', F.size('array'))
+    max_length = df_with_length.agg(F.max('length')).collect()[0][0]
+
+    # Filter out rows where the array length is less than the max length
+    df_filtered = df_with_length.filter(df_with_length['length'] < max_length)
+
+    # Filter the largest set
+    largest_set_df = df_with_length.filter(df_with_length['length'] == max_length)
+    largest_set = largest_set_df.select('array').first()['array']
+    
+    if len(df_filtered.head(1)) == 0:
+      #this represents the situation where all files have the same number samples
+      return ["0"] , [largest_set]
+    
+    else:
+      # Explode the array into multiple rows
+      df_exploded = df_filtered.withColumn('element', F.explode('array'))
+
+      # Find distinct elements in all smaller arrays
+      distinct_elements = df_exploded.select('element').distinct().rdd.map(lambda r: r[0]).collect()
+
+      # Check which elements from the distinct list are not in the largest set
+      missing_elements = set(distinct_elements) - set(largest_set)
+
+
+      # If there are missing elements, find the file paths that contain them
+      if len(missing_elements)==0:
+          file_paths_df = df_exploded.filter(df_exploded['length']<max_length).select('file_path').distinct()
+          file_paths = file_paths_df.rdd.map(lambda r: r[0]).collect()
+          return file_paths, largest_set
+      else:
+          #This represents the situation where there is a missmatch of samples
+          return ["-1"], ["-1"]
+  
+
+
+  def make_samples_df_fill_missing_samples(self, missing_file_path_list, full_sample_names_list, metadata_df, vcf_df):
+    new_vcf_df = vcf_df
+    # Broadcast the small DataFrame
+    broadcasted_metadata = F.broadcast(metadata_df)
+
+    # Create a dictionary for missing file paths
+    file_dict_df = broadcasted_metadata.filter(
+        (metadata_df.key == "samples") & (metadata_df.file_path.isin(missing_file_path_list))
+    )
+    missing_file_path_dict = {row["file_path"]: row["value"].split("\t") for row in file_dict_df.collect()}
+
+    # Filter out the missing and existing dataframes
+    missing_df = new_vcf_df.filter(new_vcf_df.file_path.isin(missing_file_path_list))
+    full_df = new_vcf_df.filter(~new_vcf_df.file_path.isin(missing_file_path_list))
+
+    # Add columns to the full dataframe
+    full_df = full_df.select("*", *[F.expr(f"samples[{i}] as {name}") for i, name in enumerate(full_sample_names_list)])
+
+    # Process missing file paths
+    for missing_file_path, sub_sample_names in missing_file_path_dict.items():
+        sub_df = missing_df.filter(missing_df.file_path == missing_file_path)
+        sub_df = sub_df.select("*", *[F.expr(f"samples[{i}] as {name}") for i, name in enumerate(sub_sample_names)])
+        full_df = full_df.unionByName(sub_df, allowMissingColumns=True)
+
+    return full_df.fillna("0")
 
 
   def update_rsID(self, dbsnp_df, in_vcf_df, out_vcf_df='', keep=False):
@@ -218,12 +299,12 @@ class prs_calc_App(AxlApp):
 
     new_vcf_df=in_vcf_df
     if keep: # keep records in gVCF that have no matching rsIDs
-        in_vcf_df = (in_vcf_df
+        new_vcf_df = (in_vcf_df
                         .withColumnRenamed('ids', 'oldID')
                         .join(filtered_dbsnp_df, on=['chromosome', 'position'], how='left')
                         ) 
     else:   
-        in_vcf_df = (in_vcf_df
+        new_vcf_df = (in_vcf_df
                         .withColumnRenamed('ids', 'oldID')
                         .join(filtered_dbsnp_df, on=['chromosome', 'position'], how='inner')
                         )
