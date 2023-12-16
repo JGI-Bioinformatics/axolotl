@@ -205,7 +205,7 @@ def get_gcf_membership(bgc_features, gcf_features):
     # output df schema: bgc_id (int), gcf_id (int), dist (float)
     """
     
-    bgc_features_partitioned = apply_l2_norm(bgc_features, "bgc_id").rdd.mapPartitions(
+    bgc_features_partitioned = bgc_features.rdd.mapPartitions(
         lambda rows: [[{row.bgc_id: row.features for row in rows}]]).toDF(
         T.StructType([
             T.StructField("bgc_features", T.MapType(T.LongType(), T.MapType(T.StringType(), T.DoubleType())))
