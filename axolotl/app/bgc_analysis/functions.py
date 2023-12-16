@@ -3,7 +3,7 @@ from pyhmmer.hmmer import hmmscan as pyhmmscan
 from pyhmmer.plan7 import HMMFile
 from pyhmmer.easel import TextSequence, Alphabet
 from sklearn.cluster import Birch
-from sklearn.preprocessing import normalize
+from sklearn.neighbors import NearestNeighbors
 import pandas as pd
 from os import path
 from glob import iglob
@@ -13,6 +13,7 @@ import warnings
 from pyspark.sql import DataFrame, Row
 import pyspark.sql.types as T
 import pyspark.sql.functions as F
+from pyspark.sql.window import Window
 
 from axolotl.utils.file import fopen
 from axolotl.utils.spark import activate_udf
@@ -175,7 +176,7 @@ def calc_bigslice_gcfs(
     gcf_features = gcf_features.toDF(T.StructType([
         T.StructField("features", T.MapType(T.StringType(), T.FloatType()))
     ])).select(
-        F.monotonically_increasing_id().alias("idx"),
+        F.monotonically_increasing_id().alias("gcf_id"),
         F.col("features")
     )
     
@@ -196,7 +197,7 @@ def apply_l2_norm(input_df: DataFrame, idx_colname: str="idx") -> DataFrame:
     return input_df.select(idx_colname, F.expr("L2Normalize(features)").alias("features"))
 
 
-def get_gcf_membership(bgc_features, gcf_features):
+def get_gcf_membership(bgc_features, gcf_features, bigslice_db_path):
     """
     Run NearestNeighbor calculation (euclidean) to match bgc to gcf
 
@@ -204,6 +205,45 @@ def get_gcf_membership(bgc_features, gcf_features):
     # gcf_features schema: gcf_id (int), features (dict[string, int/float])
     # output df schema: bgc_id (int), gcf_id (int), dist (float)
     """
+
+    def _calc_nearest_neighbors(bgc_features_dict, gcf_features_dict, column_headers):
+        if len(bgc_features_dict) < 1 or len(gcf_features_dict) < 1:
+            return []
+        bgc_ids, bgc_features = list(zip(*[(bgc_id, features) for bgc_id, features in bgc_features_dict.items()]))
+        bgc_pd_df = pd.DataFrame.from_records(
+            bgc_features,
+            index=bgc_ids,
+            columns=column_headers
+        ).fillna(0)
+        gcf_ids, gcf_features = list(zip(*[(gcf_id, features) for gcf_id, features in gcf_features_dict.items()]))
+        gcf_pd_df = pd.DataFrame.from_records(
+            gcf_features,
+            index=gcf_ids,
+            columns=column_headers
+        ).fillna(0)
+    
+        nn = NearestNeighbors(
+            metric='euclidean',
+            algorithm='brute',
+            n_jobs=1
+        )
+        nn.fit(gcf_pd_df.values)
+        
+        dists, centroids_idx = nn.kneighbors(
+            X=bgc_pd_df.values,
+            n_neighbors=1,
+            return_distance=True
+        )
+    
+        results = [
+            [int(bgc_id), int(gcf_pd_df.index[centroids_idx[i][0]]), float(dists[i][0])]
+            for i, bgc_id in enumerate(bgc_pd_df.index.values)
+        ]
+        return results
+
+    ########
+
+    column_headers = get_bigslice_features_column(bigslice_db_path)
     
     bgc_features_partitioned = bgc_features.rdd.mapPartitions(
         lambda rows: [[{row.bgc_id: row.features for row in rows}]]).toDF(
@@ -213,26 +253,22 @@ def get_gcf_membership(bgc_features, gcf_features):
     )
 
     gcf_features_partitioned = gcf_features.rdd.mapPartitions(
-        lambda rows: [[{row.idx: row.features for row in rows}]]).toDF(
+        lambda rows: [[{row.gcf_id: row.features for row in rows}]]).toDF(
         T.StructType([
             T.StructField("gcf_features", T.MapType(T.LongType(), T.MapType(T.StringType(), T.DoubleType())))
         ])
     )
-    
-    activate_udf("NearestNeighbor", T.MapType(
-        T.LongType(),
-        T.StructType([
-            T.StructField("gcf_id", T.LongType()),
-            T.StructField("dist", T.DoubleType())
-        ])
-    ))
 
-    return bgc_features_partitioned.join(gcf_features_partitioned).select(
-        F.expr("NearestNeighbor(bgc_features, gcf_features)").alias("dists")
-    ).rdd.flatMap(lambda row: [[bgc_id, res.gcf_id, res.dist] for bgc_id, res in row.dists.items()]).toDF(
+    bgc_gcf_hits = bgc_features_partitioned.join(gcf_features_partitioned).rdd.flatMap(
+        lambda chunk: _calc_nearest_neighbors(chunk.bgc_features, chunk.gcf_features, column_headers)
+    ).toDF(
         T.StructType([
             T.StructField("bgc_id", T.LongType()),
             T.StructField("gcf_id", T.LongType()),
             T.StructField("dist", T.DoubleType())
         ])
     )
+
+    w2 = Window.partitionBy("bgc_id").orderBy(F.col("dist").asc())
+    return bgc_gcf_hits.withColumn("row", F.row_number().over(w2)) \
+      .filter(F.col("row") == 1).drop("row")
