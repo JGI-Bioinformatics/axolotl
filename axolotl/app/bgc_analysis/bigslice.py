@@ -170,13 +170,13 @@ class BigsliceApp(AxlApp):
                     "cds_id", "cds_from", "cds_to", "hmm_acc"
                 )
                 biopfam_scan_df.write.parquet(biopfam_pq_path)
+            else:
+                print("fetching biopfam-scan result...")
 
             # check if already subpfam-scanned
             subpfam_pq_path = path.join(feature_folder, "subpfam-{}-{}".format(
                 biopfam_md5, subpfam_md5
             ))
-            else:
-                print("fetching biopfam-scan result...")
             if not check_file_exists(subpfam_pq_path):
                 print("running subpfam-scan...")
                 biopfam_scan_df = spark.read.parquet(biopfam_pq_path)
