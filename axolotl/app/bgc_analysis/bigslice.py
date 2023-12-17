@@ -77,6 +77,62 @@ class BigsliceApp(AxlApp):
 
     ### BigsliceApp-specific functions ###
 
+
+    def getBGCMembership(self,
+        bigslice_db_path: str, top_k: int=3, threshold: float=0.4,
+        partition_num: int=None, bgcs_per_chunk: int=4000, gcfs_per_chunk: int=4000):
+
+        spark, sc = get_spark_session_and_context()
+
+        # first, read bigslice_db folder to get the unique db ids
+        biopfam_md5, subpfam_md5 = scan_bigslice_db_folder(bigslice_db_path)
+        # fetch current bgc, cds and cds_to_bgc ids
+        bgc_df_id = self._getData("bgc")._id
+        cds_df_id = self._getData("cds")._id
+        link_df_id = self._getData("cds_to_bgc")._id
+
+        # create feature folder if not exist
+        feature_folder = path.join(
+            self._folder_path, "features",
+            "{}-{}-{}".format(
+                bgc_df_id.split("#")[1],
+                cds_df_id.split("#")[1],
+                link_df_id.split("#")[1]
+            )
+        )
+        if not check_file_exists(feature_folder):
+            make_dirs(feature_folder)
+
+        p = partition_num
+        if not p:
+            p = input_features_df.rdd.getNumPartitions()
+
+        # check if gcf centroids are calculated
+        bgc_membership_filename = "membership-p{}-t{}-k{}-{}-{}".format(
+            p, threshold, top_k, biopfam_md5, subpfam_md5
+        )
+        membership_pq_path = path.join(feature_folder, bgc_membership_filename)
+
+        if not check_file_exists(membership_pq_path):
+            bgc_vectors = self.getBGCVectors(bigslice_db_path, top_k=top_k)
+            gcf_centroids = self.getGCFCentroids(
+                bigslice_db_path, top_k=top_k, threshold=threshold, partition_num=partition_num
+            )
+            
+            print("calculating BGC-to-GCF membership... t={}, p={}".format(threshold, partition_num))
+
+            get_gcf_membership(
+                apply_l2_norm(bgc_vectors, "bgc_id").repartition(bgc_vectors.count() // bgcs_per_chunk),
+                gcf_centroids.repartition(gcf_centroids.count() // gcfs_per_chunk),
+                bigslice_db_path
+            ).write.parquet(membership_pq_path)
+
+        else:
+            print("fetching BGC-to-GCF membership... t={}, p={}".format(threshold, partition_num))
+
+        return spark.read.parquet(membership_pq_path)
+
+
     def getGCFCentroids(self, bigslice_db_path: str, top_k: int=3, threshold: float=0.4, partition_num: int=None):
 
         spark, sc = get_spark_session_and_context()
@@ -100,7 +156,7 @@ class BigsliceApp(AxlApp):
         if not check_file_exists(feature_folder):
             make_dirs(feature_folder)
 
-        input_features_df = apply_l2_norm(self.getBGCVectors(bigslice_db_path, top_k), "bgc_id")
+        input_features_df = apply_l2_norm(self.getBGCVectors(bigslice_db_path, top_k=top_k), "bgc_id")
         if not partition_num:
             partition_num = input_features_df.rdd.getNumPartitions()
         elif partition_num > 0:
