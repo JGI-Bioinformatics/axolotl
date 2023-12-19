@@ -29,9 +29,9 @@ setuptools.setup(
     install_requires=[
         "pyspark",
         "pyarrow",
-        "biopython<=1.77",
+        "biopython==1.78",
         "pyhmmer",
-        "scikit-learn",
+        "scikit-learn>=0.19.0",
         "numpy",
         "pandas",
         "tqdm"
