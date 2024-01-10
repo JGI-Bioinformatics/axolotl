@@ -15,7 +15,7 @@ def gwas_csv_input(gwas, file_type="csv", output=''):
       output (_string_): _output file_, if empty, return the dataframe
   """
 
-  spark,sc = get_spark_session_and_context()
+  spark,_ = get_spark_session_and_context()
 
   #make a mapping dictionary
   mapping = {
