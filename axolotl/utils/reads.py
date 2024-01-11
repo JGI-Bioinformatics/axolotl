@@ -17,6 +17,7 @@ Add more support for SAM/BAM formats
 """
 from axolotl.utils.spark import get_spark_session_and_context
 spark, sc = get_spark_session_and_context()
+from axolotl.utils.KMCounter import *
 
 import pyspark.sql.functions as F
 from pyspark.sql.types import StringType, LongType, DoubleType
