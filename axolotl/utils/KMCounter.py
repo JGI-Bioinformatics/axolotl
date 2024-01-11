@@ -41,11 +41,7 @@ spark.udf.registerJavaFunction("jkmerudf", "org.jgi.axolotl.udfs.jkmer", ArrayTy
 def count_kmers(reads_df, k=31, m=15, min_kmer_count=2):
     """
     given a reads dataframe with columns ['id', 'seq' ...]
-    calculate kmer to ids mapping
-    use java UDF
-    if k=m, performs kmer 
-    otherwise, performs minimizer with w = k-m
-
+    count kmers using udf function
     filter out erroreous kmers by setting min_kmer_count (default 2)
 
     returns a dataframe with two columns: 
@@ -53,17 +49,26 @@ def count_kmers(reads_df, k=31, m=15, min_kmer_count=2):
         kmer_count (long) -> counts
     """
     # kmer dataframe: kmer(Integer), kmer_count(Integer). Ids(Array(Integer))
-    reads_df.createOrReplaceTempView("reads")
-    w = k - m
-    if w <= 0:
-        w = 1 # kmers
-    query = 'SELECT id, jkmerudf(seq, {}, {}) as kmerlist from reads'.format(m,w)
-    kmer_df = (spark
-            .sql(query)
-            .select('id', F.explode("kmerlist").alias('kmer'))
+
+    kmer_df = (reads_to_kmer(reads_df, k=k, m=m, n=0)
             .groupby('kmer')
             .agg(F.count(F.lit(1)).alias("kmer_count"))
             .where(F.col("kmer_count") >=min_kmer_count)
     )
     return kmer_df
+
+def reads_to_kmer(reads_df, k=31, m=15, n=0):
+    """
+    calculate kmer to ids mapping
+    use java UDF
+    if k=m, performs kmer 
+    otherwise, performs minimizer with w = k-m
+    resulting kmer_df has two columns: "id", "kmer" 
+    """
+    w = k - m
+    if w <= 0:
+        w = 1 # kmers
+    reads_df.createOrReplaceTempView("reads")
+    query = 'SELECT id, jkmerudf(seq, {}, {}) as kmerlist from reads'.format(m,w)
+    return spark.sql(query).select('id', F.explode("kmerlist").alias('kmer'))
 
