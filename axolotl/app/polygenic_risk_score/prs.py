@@ -210,6 +210,32 @@ class prs_calc_App(AxlApp):
 
 
   def find_missing_samples_files(self,metadata_df):
+    """
+    Identifies missing sample files in a given DataFrame based on the 'samples' from metadata_df.
+    This method processes the metadata DataFrame to identify any discrepancies in the number of samples across different files.
+    
+    Args:
+    metadata_df (DataFrame): A DataFrame containing file metadata, where each row has a 'key' and 'value' column. This dict must contain a key called "samples", where the names of the samples are in the values as an array.
+
+    Returns:
+    tuple: A tuple containing two elements that are lists:
+        - The first element is a list of file paths that are missing samples if any discrepancies are found, 
+          or ["0"] if all files have the same number of samples.
+        - The second element is a list containing the largest set of samples found in the files.
+        - The method will return ["-1"] for both elements in case of a mismatch in samples.
+          Ex. If file_1.vcf has samples A , B, C , and D. But file_2.vcf has samples C, D, E and F.
+
+
+    Method does the following:
+    1. Filtering the metadata DataFrame for entries where the key is 'samples'.
+    2. Converting the 'value' field to an array of values.
+    3. Determining the maximum length of these arrays.
+    4. Identifying any rows where the array length is less than the maximum, suggesting missing samples.
+    5. Comparing smaller arrays against the largest array to identify distinct missing elements.
+        
+    """
+
+    
     filtered_metadata_df = metadata_df.filter(metadata_df.key == "samples")
 
     # Convert the 'value' column to an array of values
@@ -253,6 +279,23 @@ class prs_calc_App(AxlApp):
 
 
   def make_samples_df_fill_missing_samples(self, missing_file_path_list, full_sample_names_list, metadata_df, vcf_df):
+    """
+    Modifies VCF data and handles missing samples by filling them in with 0.
+
+    Args:
+        missing_file_path_list (list): A list of file paths that have missing sample data.
+        full_sample_names_list (list): A list of all sample names to be included in the final DataFrame.
+        metadata_df (DataFrame): A DataFrame containing metadata, used to identify missing samples.
+        vcf_df (DataFrame): A DataFrame in the Variant Call Format (VCF), containing genetic variant data.
+
+    Returns:
+        DataFrame: A unified VCF DataFrame with columns for all samples, where missing values are filled with "0".
+
+    Note:
+        This method assumes the metadata and VCF DataFrames are properly formatted and that the sample names in the 
+        full_sample_names_list correspond to those in the VCF DataFrame. It utilizes Spark functions for DataFrame operations.
+    """
+    
     new_vcf_df = vcf_df
     # Broadcast the small DataFrame
     broadcasted_metadata = F.broadcast(metadata_df)
@@ -283,11 +326,12 @@ class prs_calc_App(AxlApp):
     """_update vcf_df to latest rsIDs based on dbSNP using chrom and position, using assembly-specific dbsnp. The original column 'ID" will be renamed to 'oldID'._
 
     Args:
-        dbsnp (vcfSet): _dbSNP vcfSet
-        in_vcf (vcfSet): _input vcfSet
-        out_vcf_df (_str_): _output vcf in parquet, if empty, return vcfSet
-        keep (_bool_): _whether or not to keep records in gVCF that have no matching rsIDs in dbSNP, default to False, no keeping
+        dbsnp (Dataframe): dbSNP 
+        in_vcf (Dataframe): input vcf data
+        out_vcf_df (str): output vcf in parquet, if empty, return Dataframe
+        keep (bool): whether or not to keep records in gVCF that have no matching rsIDs in dbSNP, default to False, no keeping
     """
+    
     # update column names in dbSNP to match gVCF
     filtered_dbsnp_df = (dbsnp_df
                          .select(F.col('chromosome'), F.col('position'), F.col('ids'))
@@ -317,17 +361,18 @@ class prs_calc_App(AxlApp):
 
 
   def gvcf_to_vsf(self,gvcf_df, metadata_df, output='', min_quality=0, qfilter=False, code_mapping=''):
-    """_convert gVCF to sparse gVSF format_
-      
+    """ 
+    Convert gVCF to sparse VSF (Variable Sparse Format)  
     Args:
-        gvcf_vcf (vcfSet): _gVCF_
-        vsf (str, optional): _output gVSF_. If empty, return the dataframe(Default).
-        min_quality (int, optional): _filter out low quality variant below this_. Defaults to 0.
-        qfilter (bool, optional): _whether or not apply a filter for variant with a'PASS' status. Defaults, False.
-        code_mapping (str, optional): _code mapping file to transform allele coding_. Defaults to ''.
+        gvcf_vcf (Dataframe): dataframe of gvcf data
+        metadata_df (Dataframe): metadata dataframe
+        output (str, optional): output file path if you want the result to be saved to disk. 
+        min_quality (int, optional): Filter out low quality variant below this. Relates to QUAL in vcf file. Defaults to 0.
+        qfilter (bool, optional): whether or not apply a filter for variant with a'PASS' status. Associated with FILTER in vcf. Defaults, False.
+        code_mapping (str, optional): code mapping file to transform allele coding. Defaults to ''.
 
     Returns:
-        _any_: _none or dataframe_
+        Dataframe or None: Dataframe of gVCF after transformed to VSF
 
     Example Output:
     +------+---------+----+----+-----------+
@@ -339,6 +384,7 @@ class prs_calc_App(AxlApp):
     +------+---------+----+----+-----------+
 
     """
+    
     spark, sc = get_spark_session_and_context()
 
     vsf_folder = os.path.join(
@@ -441,13 +487,13 @@ class prs_calc_App(AxlApp):
       """_update gwas rsID with those found in dbSNP_
 
       Args:
-          dbsnp (vcf_df): dbsnp object that is in vcf_set format 
-          ref (pyspark df): gwas reference
-          out_file (str, optional): _description_. Defaults to ''.
-          overwrite (bool, optional): _description_. Defaults to False.
+          dbsnp (Dataframe): dbsnp object that is in vcf_set format 
+          gwas_df (Dataframe): gwas reference Dataframe
+          output (str, optional): Output path to save data as a parquet.  
+          overwrite (bool, optional): If you want to overwrite an existing output. Defaults to False.
 
       Returns:
-          _type_: _description_
+          Dataframe
       """
 
       ref = (gwas_df
@@ -492,16 +538,20 @@ class prs_calc_App(AxlApp):
 
 
   def gwas_add_code(self,dbsnp_df, gwas_df, code_mapping, output=''):
-    """_summary_
+    """
+    Enhances a GWAS DataFrame by adding genetic variant codes from a dbSNP DataFrame and mapping these codes.
+
 
     Args:
-        dbsnp (_type_): _description_
-        ref (_type_): _description_
-        code_mapping (_type_): _description_
-        out_file (str, optional): _description_. Defaults to ''.
+        dbsnp_df (DataFrame): A DataFrame containing dbSNP data. Must contain the following columns: 'ids', 'allele', and 'code'.
+        gwas_df (DataFrame): A DataFrame containing GWAS data with relevant columns for joining with dbsnp_df.
+        code_mapping (DataFrame): A DataFrame for mapping dbSNP codes to 1000 Genomes Project codes.
+        output (str, optional): The file path where the resultant DataFrame should be written in Parquet format. 
+                                If empty, the DataFrame is returned instead of being written to a file.
 
     Returns:
-        _type_: _description_
+        DataFrame or None: The modified GWAS DataFrame with additional genetic variant codes. Returns None if the DataFrame is written to a file.
+        
     """
 
     gwas_df = ( gwas_df
@@ -527,7 +577,21 @@ class prs_calc_App(AxlApp):
 
   def calc_PRS(self,gvsf, gwas_df,min_quality, qfilter, output=''):
     """
-    Method for calculating Polygeneic Risk Scores (PRS). Options min_quality and qfilter need to correspond to the values in gvcf_to_vsf. They are mainly used for retrieving the path to the results folder.  
+    Method for calculating Polygeneic Risk Scores (PRS). Options min_quality and qfilter need to correspond to the values in gvcf_to_vsf.
+    Args:
+        gvsf (DataFrame): A DataFrame in the Genomic Variant Sparse Format containing genetic variant data.
+        gwas_df (DataFrame): A DataFrame containing Genome-Wide Association Study data.
+        min_quality (int or str): The minimum quality parameter, also used for helping name the results folder.
+        qfilter (int or str): The qfilter parameter, also used for helping name the results folder.
+        output (str, optional): The file path where the resultant data should be written in CSV format. 
+                                If empty, the data is not written to a CSV file.
+
+    Returns:
+        DataFrame: A Spark DataFrame containing the calculated PRS.
+
+    Note:
+        The method assumes the input DataFrames are in the correct format and contain necessary columns for computation.
+        It also requires a Spark session to read from and write to parquet files.
     """
 
     results_folder = os.path.join(
@@ -564,7 +628,15 @@ class prs_calc_App(AxlApp):
 
   def calc_prs_pipeline(self, input_min_quality=0, input_qfilter=False):
     """
-    Runs whole pipeline. 
+    Runs whole prs pipeline.
+    
+    Args:
+      input_min_quality (int, optional): Filter out low quality variant below this. Relates to QUAL in vcf file. Defaults to 0.
+      input_qfilter (bool, optional): whether or not apply a filter for variant with a'PASS' status. Associated with FILTER in vcf. Defaults, False.
+
+    Returns:
+      Dataframe: PRS results
+
     """
 
     # fetch current 
