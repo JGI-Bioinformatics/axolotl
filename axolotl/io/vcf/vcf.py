@@ -1,6 +1,3 @@
-import pyspark.sql.functions as F
-import pyspark.sql.types as T
-
 from axolotl.io import AxlIO
 from axolotl.data.vcf.vcf import vcfDF
 from axolotl.data import MetaDF

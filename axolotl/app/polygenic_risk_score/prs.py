@@ -1,5 +1,4 @@
 import pyspark.sql.functions as F
-import pyspark.sql.types as T
 from pyspark.sql import DataFrame
 from pyspark.mllib.linalg.distributed import IndexedRow, IndexedRowMatrix
 from pyspark.sql.types import ArrayType, StringType
@@ -23,8 +22,8 @@ class prs_calc_App(AxlApp):
   @classmethod
   def _dataDesc(cls) -> Dict:
     """
-    Where AxlDFs are defined as a Dict. Format is "your_axlDF_name" : AxlDF_subclass
-    This field only accepts AxlDFs and classes that inherit from AxlDF
+    Returns metadata as a Dict. Format is "axlDF_name" : AxlDF_subclass
+    This field only accepts AxlDFs and classes that are inherited from AxlDF
 
     """
 
@@ -36,13 +35,12 @@ class prs_calc_App(AxlApp):
 
   def _creationFunc(self, vcf_metadata_df:MetaDF, vcf_vcf_df:vcfDF, gwas_df:DataFrame, dbsnp_vcf_df:vcfDF=None):
     """
+    Creates the PRS App and saves intermediate data into the app folder.
     Args:
-      vcf_metadata_df(MetaDF) : VCF Metadata 
-      vcf_vcf_df(vcfDF) : vcfDF of your vcf data
-      gwas_df(DataFrame) : Dataframe of GWAS data
-      dbsnp_vcf_df(vcfDF) : dbsnp data
-    
-    Create function is used to create the app and also collect your inputs. It is also responsible for saving intermediates of your inputs into the app folder. 
+      vcf_metadata_df(MetaDF) : metadata dataframe 
+      vcf_vcf_df(vcfDF) : genome VCF dataframe
+      gwas_df(DataFrame) : Dataframe of GWAS dataframe
+      dbsnp_vcf_df(vcfDF) : dbsnp VCF dataframe
 
     """
     spark, sc = get_spark_session_and_context()
@@ -105,18 +103,18 @@ class prs_calc_App(AxlApp):
 
   def _loadExtraData(self):
     """
-    This is here to load the Dataframes you create in the create function. We used _dataDesc to hold all AxlDFs. This is only stuff you need initially at the start of your pipeline that don't already have a function that takes care of reading in the data. In our case Calc_PRS. 
+    Load the AxlDFs (specified in the _dataDesc) needed in the create function. 
     """
-    spark, sc = get_spark_session_and_context()
+    spark, _ = get_spark_session_and_context()
 
     app_loc=self._folder_path
-
+    # GWAS data
     gwas_loc=os.path.join(app_loc, "gwas_df_folder")
     self._gwas_df = spark.read.parquet(gwas_loc)
-
+    # dbSNP VCF data
     dbsnp_loc=os.path.join(app_loc, "dbsnp_df_folder")
     self._dbsnp_df = spark.read.parquet(dbsnp_loc)
-    
+    # gVCF data
     vcf_loc=os.path.join(app_loc, "vcf_df_folder")
     self._vcf_df = spark.read.parquet(vcf_loc)
 
@@ -126,10 +124,8 @@ class prs_calc_App(AxlApp):
 
   def update_chromosome(self,vcf_df): 
     """
-    Input:Dataframe with a column called "chromosome"
-    Method will set chromosome to old_chromosome. 
-    Will create new "chromosome" column after extracting the chromosome number 
-    Ex: NC_000007.13 -> 7 or NC_000008.10 -> 8
+    The "chromosome" column will be updated to integers 1-25, the old names are in "old_chromosome" column. 
+    Ex: NC_000007.13 -> 7 or NC_000008.10 -> 8, X -> 23, Y -> 24, M -> 25
 
     """
     # table to replace chromosome numbering. Used for update_chromosome function.
@@ -141,7 +137,6 @@ class prs_calc_App(AxlApp):
     mapping.update({str(i+1):(i+1) for i in range(25)})
     chr_mapping = F.create_map([F.lit(x) for x in chain(*mapping.items())])
 
-    
     new_vcf_df=vcf_df.withColumnRenamed("chromosome", "old_chromosome").withColumn("chromosome", F.regexp_extract(F.col("old_chromosome"), r'NC_0+(\d+).|(?:1\d?|2[0-5]?)', 1))
     new_vcf_df=new_vcf_df.withColumn('chromosome', chr_mapping[new_vcf_df['chromosome']])
     return new_vcf_df
@@ -152,7 +147,7 @@ class prs_calc_App(AxlApp):
     """
     Transforms the "ids" column in the given DataFrame by extracting the numerical part
     from entries in the format "rs<digits>". Additionally, casts the "ids" column to long datatype.
-    Entries not matching the "rs<digits>" format remain unchanged.
+    Entries not matching the "rs<digits>" format were assumed to be numerical and remain unchanged.
     """
     if "ids" in dbsnp_df.columns:
         new_dbsnp_df = (dbsnp_df
@@ -166,9 +161,7 @@ class prs_calc_App(AxlApp):
 
   def add_dbsnp_code(self,dbsnp_df):
     """
-    Augments the given DataFrame by exploding the combined 'references' and 'alts' columns 
-    into two new columns: 'code' (position/index) and 'allele' (actual value). 
-    The original values are concatenated and then split to achieve the explosion.
+    Encode alleles. Reference alleles become 0s, while altternative alleles are numbered as 1..n
     Ex:
     Input 
     +---+-----------+------+
@@ -323,13 +316,20 @@ class prs_calc_App(AxlApp):
 
 
   def update_rsID(self, dbsnp_df, in_vcf_df, out_vcf_df='', keep=False):
-    """_update vcf_df to latest rsIDs based on dbSNP using chrom and position, using assembly-specific dbsnp. The original column 'ID" will be renamed to 'oldID'._
+    """_update vcf_df to match rsIDs in dbSNP using chrom and position, using assembly-specific dbSNP. The original column 'ID" will be renamed to 'oldID'._
 
     Args:
+<<<<<<< HEAD
         dbsnp (Dataframe): dbSNP 
         in_vcf (Dataframe): input vcf data
         out_vcf_df (str): output vcf in parquet, if empty, return Dataframe
         keep (bool): whether or not to keep records in gVCF that have no matching rsIDs in dbSNP, default to False, no keeping
+=======
+        dbsnp (vcfSet): dbSNP
+        in_vcf (vcfSet): _input vcfSet
+        out_vcf_df (_str_): _output vcf in parquet, if empty, return vcfSet
+        keep (_bool_): _whether or not to keep records in gVCF that have no matching rsIDs in dbSNP, default to False, no keeping
+>>>>>>> 7988610e4e7f3a605f97210788244c57dd4ea83f
     """
     
     # update column names in dbSNP to match gVCF
@@ -384,8 +384,12 @@ class prs_calc_App(AxlApp):
     +------+---------+----+----+-----------+
 
     """
+<<<<<<< HEAD
     
     spark, sc = get_spark_session_and_context()
+=======
+    spark, _ = get_spark_session_and_context()
+>>>>>>> 7988610e4e7f3a605f97210788244c57dd4ea83f
 
     vsf_folder = os.path.join(
             self._folder_path, "vsf",
@@ -493,7 +497,11 @@ class prs_calc_App(AxlApp):
           overwrite (bool, optional): If you want to overwrite an existing output. Defaults to False.
 
       Returns:
+<<<<<<< HEAD
           Dataframe
+=======
+          _any_: _none or dataframe_ 
+>>>>>>> 7988610e4e7f3a605f97210788244c57dd4ea83f
       """
 
       ref = (gwas_df
@@ -550,8 +558,12 @@ class prs_calc_App(AxlApp):
                                 If empty, the DataFrame is returned instead of being written to a file.
 
     Returns:
+<<<<<<< HEAD
         DataFrame or None: The modified GWAS DataFrame with additional genetic variant codes. Returns None if the DataFrame is written to a file.
         
+=======
+        _any_: _none or dataframe_
+>>>>>>> 7988610e4e7f3a605f97210788244c57dd4ea83f
     """
 
     gwas_df = ( gwas_df

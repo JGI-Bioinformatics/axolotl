@@ -1,6 +1,6 @@
 """axolotl.data.vcf
 
-Contain classes definition for handing genotype VCF data
+Classes definition for genotype VCF data
 """
 
 from pyspark.sql import Row, types

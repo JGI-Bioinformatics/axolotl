@@ -2,7 +2,6 @@ import pyspark.sql.functions as F
 import pyspark.sql.types as T
 from pyspark.sql import Row
 from Bio.Seq import Seq
-from Bio.Alphabet import generic_dna
 
 from axolotl.data import ioDF
 from axolotl.data.annotation.base import RawFeatDF
@@ -79,7 +78,7 @@ class cdsDF(ioDF):
             return None
         else:
             return str(
-                Seq(seq, generic_dna).translate(table=transl_table if transl_table else "Standard")
+                Seq(seq).translate(table=transl_table if transl_table else "Standard")
             ).rstrip("*")
 
     @classmethod

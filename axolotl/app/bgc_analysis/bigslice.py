@@ -9,7 +9,10 @@ from axolotl.data.sequence import NuclSeqDF
 from axolotl.data.annotation import RawFeatDF, bgcDF, cdsDF
 from axolotl.utils.file import check_file_exists, make_dirs
 from axolotl.utils.spark import get_spark_session_and_context
-from axolotl.app.bgc_analysis.functions import scan_bigslice_db_folder, scan_cdsDF, run_hmmscan
+from axolotl.app.bgc_analysis.functions import (
+    scan_bigslice_db_folder, scan_cdsDF, run_hmmscan,
+    calc_bigslice_gcfs, apply_l2_norm, get_gcf_membership
+)
 
 from typing import Dict
 from os import path
@@ -74,12 +77,113 @@ class BigsliceApp(AxlApp):
 
     ### BigsliceApp-specific functions ###
 
+
+    def getBGCMembership(self,
+        bigslice_db_path: str, top_k: int=3, threshold: float=0.4,
+        partition_num: int=None, bgcs_per_chunk: int=4000, gcfs_per_chunk: int=4000):
+
+        spark, sc = get_spark_session_and_context()
+
+        # first, read bigslice_db folder to get the unique db ids
+        biopfam_md5, subpfam_md5 = scan_bigslice_db_folder(bigslice_db_path)
+        # fetch current bgc, cds and cds_to_bgc ids
+        bgc_df_id = self._getData("bgc")._id
+        cds_df_id = self._getData("cds")._id
+        link_df_id = self._getData("cds_to_bgc")._id
+
+        # create feature folder if not exist
+        feature_folder = path.join(
+            self._folder_path, "features",
+            "{}-{}-{}".format(
+                bgc_df_id.split("#")[1],
+                cds_df_id.split("#")[1],
+                link_df_id.split("#")[1]
+            )
+        )
+        if not check_file_exists(feature_folder):
+            make_dirs(feature_folder)
+
+        p = partition_num
+        if not p:
+            p = input_features_df.rdd.getNumPartitions()
+
+        # check if gcf centroids are calculated
+        bgc_membership_filename = "membership-p{}-t{}-k{}-{}-{}".format(
+            p, threshold, top_k, biopfam_md5, subpfam_md5
+        )
+        membership_pq_path = path.join(feature_folder, bgc_membership_filename)
+
+        if not check_file_exists(membership_pq_path):
+            bgc_vectors = self.getBGCVectors(bigslice_db_path, top_k=top_k)
+            gcf_centroids = self.getGCFCentroids(
+                bigslice_db_path, top_k=top_k, threshold=threshold, partition_num=partition_num
+            )
+            
+            print("calculating BGC-to-GCF membership... t={}, p={}".format(threshold, partition_num))
+
+            get_gcf_membership(
+                apply_l2_norm(bgc_vectors, "bgc_id").repartition(bgc_vectors.count() // bgcs_per_chunk),
+                gcf_centroids.repartition(gcf_centroids.count() // gcfs_per_chunk),
+                bigslice_db_path
+            ).write.parquet(membership_pq_path)
+
+        else:
+            print("fetching BGC-to-GCF membership... t={}, p={}".format(threshold, partition_num))
+
+        return spark.read.parquet(membership_pq_path)
+
+
+    def getGCFCentroids(self, bigslice_db_path: str, top_k: int=3, threshold: float=0.4, partition_num: int=None):
+
+        spark, sc = get_spark_session_and_context()
+
+        # first, read bigslice_db folder to get the unique db ids
+        biopfam_md5, subpfam_md5 = scan_bigslice_db_folder(bigslice_db_path)
+        # fetch current bgc, cds and cds_to_bgc ids
+        bgc_df_id = self._getData("bgc")._id
+        cds_df_id = self._getData("cds")._id
+        link_df_id = self._getData("cds_to_bgc")._id
+
+        # create feature folder if not exist
+        feature_folder = path.join(
+            self._folder_path, "features",
+            "{}-{}-{}".format(
+                bgc_df_id.split("#")[1],
+                cds_df_id.split("#")[1],
+                link_df_id.split("#")[1]
+            )
+        )
+        if not check_file_exists(feature_folder):
+            make_dirs(feature_folder)
+
+        input_features_df = apply_l2_norm(self.getBGCVectors(bigslice_db_path, top_k=top_k), "bgc_id")
+        if not partition_num:
+            partition_num = input_features_df.rdd.getNumPartitions()
+        elif partition_num > 0:
+            input_features_df = input_features_df.repartition(partition_num)
+
+        # check if gcf centroids are calculated
+        gcf_centroids_filename = "gcf-p{}-t{}-k{}-{}-{}".format(
+            partition_num, threshold, top_k, biopfam_md5, subpfam_md5
+        )
+        gcf_pq_path = path.join(feature_folder, gcf_centroids_filename)
+
+        if not check_file_exists(gcf_pq_path):
+            print("calculating GCF centroids... t={}, p={}".format(threshold, partition_num))
+            calc_bigslice_gcfs(
+                input_features_df, bigslice_db_path, threshold
+            ).write.parquet(gcf_pq_path)
+        else:
+            print("fetching GCF centroids... t={}, p={}".format(threshold, partition_num))
+
+        return spark.read.parquet(gcf_pq_path)
+
+
     def getBGCVectors(self, bigslice_db_path: str, top_k: int=3) -> DataFrame:
 
         spark, sc = get_spark_session_and_context()
 
         # first, read bigslice_db folder to get the unique db ids
-        print("checking bigslice_db folder...")
         biopfam_md5, subpfam_md5 = scan_bigslice_db_folder(bigslice_db_path)
 
         # fetch current bgc, cds and cds_to_bgc ids
@@ -122,6 +226,8 @@ class BigsliceApp(AxlApp):
                     "cds_id", "cds_from", "cds_to", "hmm_acc"
                 )
                 biopfam_scan_df.write.parquet(biopfam_pq_path)
+            else:
+                print("fetching biopfam-scan result...")
 
             # check if already subpfam-scanned
             subpfam_pq_path = path.join(feature_folder, "subpfam-{}-{}".format(
@@ -190,6 +296,8 @@ class BigsliceApp(AxlApp):
                 .select("cds_id", "cds_from", "cds_to", "corepfam", "sub_pfams")
 
                 result_df.write.parquet(subpfam_pq_path)
+            else:
+                print("fetching biopfam-scan result...")
 
             # first, get merged features dataframe of biopfam hits and subpfam hits
             cds_to_bgc_df = self.getData("cds_to_bgc").df
@@ -245,7 +353,7 @@ class BigsliceApp(AxlApp):
             # ------------------------------------------------------
             # | 0      | { "PKS_KS:1": 255, "PKS_KS:5": 155, ... } |
             # ------------------------------------------------------
-            print("calculating feature vectors...")
+            print("calculating feature vectors... k={}".format(top_k))
             feature_df = biopfam_feat_df.join(subpfam_feat_df, "bgc_id", "outer").select(
                 F.col("bgc_id"),
                 F.udf(
@@ -253,5 +361,7 @@ class BigsliceApp(AxlApp):
                 )(F.col("biopfams"), F.col("subpfams")).alias("features")
             )
             feature_df.write.parquet(feature_pq_path)
+        else:
+            print("fetching feature vectors... k={}".format(top_k))
 
         return spark.read.parquet(feature_pq_path)
