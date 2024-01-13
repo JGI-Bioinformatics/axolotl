@@ -68,9 +68,9 @@ class prs_calc_App(AxlApp):
       current_vcf_data = vcf_vcf_df.df
       missing_file_paths_list, full_sample_list = self.find_missing_samples_files(current_vcf_metadata)
 
-      if missing_file_paths_list == "0": 
+      if missing_file_paths_list == ['0']: 
         current_vcf_data = self.make_samples_df(current_vcf_metadata,current_vcf_data)
-      elif missing_file_paths_list == "-1":
+      elif missing_file_paths_list == ['-1']:
         print("There is a missmatch in samples")
         current_vcf_data = self.make_samples_df(current_vcf_metadata,current_vcf_data)
       else: 
@@ -247,7 +247,7 @@ class prs_calc_App(AxlApp):
     
     if len(df_filtered.head(1)) == 0:
       #this represents the situation where all files have the same number samples
-      return ["0"] , [largest_set]
+      return ["0"] , largest_set
     
     else:
       # Explode the array into multiple rows
@@ -319,17 +319,10 @@ class prs_calc_App(AxlApp):
     """_update vcf_df to match rsIDs in dbSNP using chrom and position, using assembly-specific dbSNP. The original column 'ID" will be renamed to 'oldID'._
 
     Args:
-<<<<<<< HEAD
         dbsnp (Dataframe): dbSNP 
         in_vcf (Dataframe): input vcf data
         out_vcf_df (str): output vcf in parquet, if empty, return Dataframe
         keep (bool): whether or not to keep records in gVCF that have no matching rsIDs in dbSNP, default to False, no keeping
-=======
-        dbsnp (vcfSet): dbSNP
-        in_vcf (vcfSet): _input vcfSet
-        out_vcf_df (_str_): _output vcf in parquet, if empty, return vcfSet
-        keep (_bool_): _whether or not to keep records in gVCF that have no matching rsIDs in dbSNP, default to False, no keeping
->>>>>>> 7988610e4e7f3a605f97210788244c57dd4ea83f
     """
     
     # update column names in dbSNP to match gVCF
@@ -384,12 +377,7 @@ class prs_calc_App(AxlApp):
     +------+---------+----+----+-----------+
 
     """
-<<<<<<< HEAD
-    
-    spark, sc = get_spark_session_and_context()
-=======
     spark, _ = get_spark_session_and_context()
->>>>>>> 7988610e4e7f3a605f97210788244c57dd4ea83f
 
     vsf_folder = os.path.join(
             self._folder_path, "vsf",
@@ -497,11 +485,7 @@ class prs_calc_App(AxlApp):
           overwrite (bool, optional): If you want to overwrite an existing output. Defaults to False.
 
       Returns:
-<<<<<<< HEAD
           Dataframe
-=======
-          _any_: _none or dataframe_ 
->>>>>>> 7988610e4e7f3a605f97210788244c57dd4ea83f
       """
 
       ref = (gwas_df
@@ -558,12 +542,8 @@ class prs_calc_App(AxlApp):
                                 If empty, the DataFrame is returned instead of being written to a file.
 
     Returns:
-<<<<<<< HEAD
         DataFrame or None: The modified GWAS DataFrame with additional genetic variant codes. Returns None if the DataFrame is written to a file.
         
-=======
-        _any_: _none or dataframe_
->>>>>>> 7988610e4e7f3a605f97210788244c57dd4ea83f
     """
 
     gwas_df = ( gwas_df
