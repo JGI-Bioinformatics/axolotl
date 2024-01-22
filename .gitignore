@@ -1,3 +1,12 @@
+# MacOS
+.DS_Store
+
+# for udf sbt folder
+axolotl/udf/*
+!axolotl/udf/src
+!axolotl/udf/build.sbt
+!axolotl/udf/README.md
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -104,3 +113,4 @@ ENV/
 # IDE settings
 .vscode/
 .idea/
+.editorconfig
