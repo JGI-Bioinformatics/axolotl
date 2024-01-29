@@ -96,7 +96,7 @@ chmod +x start-worker-and-wait.sh
 
 ### Running Spark on HPC Cluster through Interactive Jupyter Notebook
 Get Master Node
-#Master terminal on HPC
+On Master Terminal on HPC
 ```
 srun .... --pty /bin/bash
 
@@ -105,13 +105,13 @@ cd $CONDA_PREFIX/bin/spark-3.5.0-bin-hadoop3/sbin
 ./start-master.sh
 ```
 
-#Now cd to where you want to start your jupyter notebook server
-#starting jupyter notebook server
+Now cd to where you want to start your jupyter notebook server
+Starting Jupyter Notebook server
 ```
 jupyter notebook --ip 0.0.0.0 --port 8888 --no-browser
 ```
 
-#Worker Terminal on HPC
+On Worker Terminal on HPC
 ```
 conda activate <NEW_ENV>
 
@@ -121,16 +121,16 @@ sbatch <your_normal_parameters> -n 1 -c <cpu_per_node> -m <mem_per_node> --array
 ```
 
 
-#Local Terminal
+On Local Terminal
 ```
 echo <master_node> | xargs -I {} ssh -N -L localhost:8888:{}:8888 -L localhost:4040:{}:4040 -L localhost:18080:{}:18080 -L localhost:8080:{}:8080 <your_HPC_username>
 ```
 
-#On Web Browser
-#For Python Notebook go to localhost:8888
-#For History Server go to localhost:18080
-#For Spark UI go to localhost:4040
-#For Executor go to localhost:8080
+On Web Browser
+For Python Notebook go to localhost:8888
+For History Server go to localhost:18080
+For Spark UI go to localhost:4040
+For Executor go to localhost:8080
 
 
 
