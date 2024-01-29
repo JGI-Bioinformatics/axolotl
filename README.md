@@ -24,9 +24,75 @@ In summary, the name "Axolotl" for the Python library is a metaphorical represen
 ### Usage examples
 
 ### How to install
-* Conda
-* pip
-* Docker
+Installation: 
+Clean, Create, and Activate Conda Environment: 
+Make sure conda-forge is added to your channel before doing this
+```
+conda clean -a 
+conda create -n <NEW_ENV> python=3.11 openjdk=8.0
+conda activate  <NEW_ENV> 
+```
+
+Download, tar, and Install Spark 
+Go to https://spark.apache.org/downloads.html
+Use wget to download Spark into the Bin of Conda Environment
+```
+cd $CONDA_PREFIX/bin
+wget https://dlcdn.apache.org/spark/spark-3.5.0/spark-3.5.0-bin-hadoop3.tgz
+tar -xvzf spark-3.5.0-bin-hadoop3.tgz
+```
+
+Write a new spark_activate.sh script
+```
+cd $CONDA_PREFIX/ect/conda/activate.d 
+vi spark_activate.sh 
+
+--------------------------------------------------------------------------------
+#!/bin/bash
+
+export SPARK_HOME_CONDA_BACKUP=${SPARK_HOME:-}
+export SPARK_HOME=$CONDA_PREFIX/bin/spark-3.5.0-bin-hadoop3
+--------------------------------------------------------------------------------
+```
+
+Write a new spark_deactivate.sh script
+```
+cd $CONDA_PREFIX/ect/conda/deactivate.d 
+vi spark_deactivate.sh 
+
+--------------------------------------------------------------------------------
+#!/bin/bash
+
+export SPARK_HOME=$SPARK_HOME_CONDA_BACKUP
+unset SPARK_HOME_CONDA_BACKUP
+if [ -z $SPARK_HOME ]; then
+        unset SPARK_HOME
+fi
+--------------------------------------------------------------------------------
+```
+
+Install pyspark and axolotl@dev
+```
+pip install pyspark==3.5 
+pip install --force-reinstall git+https://github.com/zhongwang/axolotl.git@dev
+```
+
+Create start-worker-and-wait.sh custom script
+```
+cd $CONDA_PREFIX/bin
+vi start-worker-and-wait.sh 
+--------------------------------------------------------------------------------
+#!/bin/bash
+$SPARK_HOME/sbin/start-worker.sh $@
+while true
+  do sleep 10000
+done
+--------------------------------------------------------------------------------
+
+chmod +x start-worker-and-wait.sh
+```
+
+
 
 ### License
 Axolotl is licensed under the BSD License.
