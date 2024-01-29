@@ -21,7 +21,7 @@ In summary, the name "Axolotl" for the Python library is a metaphorical represen
 
 
 
-### How to install
+### How to Install Axolotl on HPC
 Installation: 
 Clean, Create, and Activate Conda Environment: 
 Make sure conda-forge is added to your channel before doing this
@@ -31,7 +31,7 @@ conda create -n <NEW_ENV> python=3.11 openjdk=8.0
 conda activate  <NEW_ENV> 
 ```
 
-Download, tar, and Install Spark 
+Download, tar, and install Spark 
 Go to https://spark.apache.org/downloads.html
 Use wget to download Spark into the Bin of Conda Environment
 ```
@@ -69,10 +69,10 @@ fi
 --------------------------------------------------------------------------------
 ```
 
-Install pyspark and axolotl@dev
+Install PySpark and Axolotl
 ```
 pip install pyspark==3.5 
-pip install --force-reinstall git+https://github.com/zhongwang/axolotl.git@dev
+pip install --force-reinstall git+https://github.com/JGI-Bioinformatics/axolotl.git@main
 ```
 
 Create start-worker-and-wait.sh custom script
