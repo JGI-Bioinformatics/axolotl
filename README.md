@@ -126,10 +126,10 @@ On Local Terminal
 echo <master_node> | xargs -I {} ssh -N -L localhost:8888:{}:8888 -L localhost:4040:{}:4040 -L localhost:18080:{}:18080 -L localhost:8080:{}:8080 <your_HPC_username>
 ```
 
-On Web Browser
-For Python Notebook go to localhost:8888
-For History Server go to localhost:18080
-For Spark UI go to localhost:4040
+On Web Browser:
+For Python Notebook go to localhost:8888,
+For History Server go to localhost:18080,
+For Spark UI go to localhost:4040,
 For Executor go to localhost:8080
 
 
