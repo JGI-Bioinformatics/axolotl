@@ -2,6 +2,7 @@ import pyspark.sql.functions as F
 from pyspark.sql import DataFrame
 from pyspark.mllib.linalg.distributed import IndexedRow, IndexedRowMatrix
 from pyspark.sql.types import ArrayType, StringType
+from pyspark.sql.window import Window
 
 from axolotl.app.base import AxlApp
 from axolotl.io.vcf import vcfDataIO, vcfMetaIO
@@ -10,6 +11,7 @@ from axolotl.data.vcf import vcfDF
 from axolotl.data import MetaDF
 from axolotl.utils.file import check_file_exists, is_directory, parse_path_type, get_temp_dir, make_dirs
 from axolotl.utils.spark import get_spark_session_and_context
+from axolotl.utils.deduplicate_find_median import find_median_of_duplicates
 
 from itertools import chain
 from typing import Dict
@@ -33,7 +35,7 @@ class prs_calc_App(AxlApp):
     }
 
 
-  def _creationFunc(self, vcf_metadata_df:MetaDF, vcf_vcf_df:vcfDF, gwas_df:DataFrame, dbsnp_vcf_df:vcfDF=None):
+  def _creationFunc(self, vcf_metadata_df:MetaDF, vcf_vcf_df:vcfDF, gwas_df:DataFrame, dbsnp_vcf_df:vcfDF=None, vcf_deduplicate:bool=True, dbsnp_deduplicate:bool=True, gwas_deduplicate:bool=True):
     """
     Creates the PRS App and saves intermediate data into the app folder.
     Args:
@@ -50,13 +52,17 @@ class prs_calc_App(AxlApp):
     self._saveData("vcf_metadata")
     current_vcf_metadata=vcf_metadata_df.df
 
+      
     current_dbsnp_data = dbsnp_vcf_df
     if current_dbsnp_data != None:
       current_dbsnp_data = current_dbsnp_data.df
+        
+      if dbsnp_deduplicate==True:
+        current_dbsnp_data = current_dbsnp_data.dropDuplicates(['ids','chromosome','position'])
+          
       current_dbsnp_data=self.update_chromosome(current_dbsnp_data)
       current_dbsnp_data = self.chop_dbsnp_rsID(current_dbsnp_data)
       current_dbsnp_data=self.add_dbsnp_code(current_dbsnp_data)
-      
       dbsnp_pq_loc=self._folder_path
       dbsnp_pq_loc=os.path.join(dbsnp_pq_loc, "dbsnp_df_folder")
       current_dbsnp_data.write.parquet(dbsnp_pq_loc)
@@ -66,6 +72,9 @@ class prs_calc_App(AxlApp):
 
 
       current_vcf_data = vcf_vcf_df.df
+
+      if vcf_deduplicate==True:
+        current_vcf_data = current_vcf_data.dropDuplicates(['ids','chromosome','position','references','alts'])
       missing_file_paths_list, full_sample_list = self.find_missing_samples_files(current_vcf_metadata)
 
       if missing_file_paths_list == ['0']: 
@@ -86,7 +95,8 @@ class prs_calc_App(AxlApp):
       self._vcf_df = spark.read.parquet(vcf_loc)
 
 
-
+      if gwas_deduplicate==True:
+        gwas_df = find_median_of_duplicates(gwas_df,'OR',['ids','alt','chromosome','position','trait','pubmedID'],['ids','alt','OR','chromosome','position'])
       current_gwas_df = self.gwas_fill_rsID(current_dbsnp_data, gwas_df)
       code_mapping = self.allele_encoding(current_dbsnp_data, current_vcf_data, code_mappings='')
       current_gwas_df = self.gwas_add_code(current_dbsnp_data,current_gwas_df,code_mapping, output='')
@@ -329,7 +339,8 @@ class prs_calc_App(AxlApp):
     filtered_dbsnp_df = (dbsnp_df
                          .select(F.col('chromosome'), F.col('position'), F.col('ids'))
                          )
-
+      
+    filtered_dbsnp_df = filtered_dbsnp_df.dropDuplicates(['chromosome', 'position','ids'])
     # Get the list of all columns from the original DataFrame
     #all_columns = in_vcf.get("data").df.columns
     #join_columns = ['chromosome', 'position']
@@ -343,8 +354,9 @@ class prs_calc_App(AxlApp):
     else:   
         new_vcf_df = (in_vcf_df
                         .withColumnRenamed('ids', 'oldID')
-                        .join(filtered_dbsnp_df, on=['chromosome', 'position'], how='inner')
+                        .join(filtered_dbsnp_df, on=['chromosome', 'position'], how='left')
                         )
+        new_vcf_df = new_vcf_df.dropna(subset=['ids','chromosome','position'])
 
     if out_vcf_df != '':
       in_vcf_df.write.mode('overwrite').parquet(out_vcf_df)
@@ -491,6 +503,7 @@ class prs_calc_App(AxlApp):
       ref = (gwas_df
             .join(dbsnp_df.select('chromosome', 'position', F.col('ids').alias('newids')), on=['chromosome', 'position'], how='left')
       )
+      ref = ref.dropna(subset=['newids','chromosome','position'])
       if overwrite:
           ref = ref.drop('ids').withColumnRenamed('newids', 'ids')     
       else:
