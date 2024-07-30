@@ -36,8 +36,8 @@ Go to https://spark.apache.org/downloads.html
 Use wget to download Spark into the Bin of Conda Environment
 ```
 cd $CONDA_PREFIX/bin
-wget https://dlcdn.apache.org/spark/spark-3.5.0/spark-3.5.0-bin-hadoop3.tgz
-tar -xvzf spark-3.5.0-bin-hadoop3.tgz
+wget [https://www.apache.org/dyn/closer.lua/spark/spark-3.5.1/spark-3.5.1-bin-hadoop3.tgz](https://www.apache.org/dyn/closer.lua/spark/spark-3.5.1/spark-3.5.1-bin-hadoop3.tgz)
+tar -xvzf spark-3.5.1-bin-hadoop3.tgz
 ```
 
 Write a new spark_activate.sh script
