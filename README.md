@@ -42,8 +42,7 @@ tar -xvzf spark-3.5.1-bin-hadoop3.tgz
 
 Write a new spark_activate.sh script
 ```
-cd $CONDA_PREFIX/ect/conda/activate.d 
-vi spark_activate.sh 
+vi $CONDA_PREFIX/etc/conda/activate.d/spark_activate.sh 
 
 --------------------------------------------------------------------------------
 #!/bin/bash
@@ -55,8 +54,7 @@ export SPARK_HOME=$CONDA_PREFIX/bin/spark-3.5.0-bin-hadoop3
 
 Write a new spark_deactivate.sh script
 ```
-cd $CONDA_PREFIX/ect/conda/deactivate.d 
-vi spark_deactivate.sh 
+vi $CONDA_PREFIX/etc/conda/deactivate.d/spark_deactivate.sh 
 
 --------------------------------------------------------------------------------
 #!/bin/bash
@@ -71,25 +69,24 @@ fi
 
 Install PySpark and Axolotl
 ```
-pip install pyspark==3.5 
-pip install --force-reinstall git+https://github.com/JGI-Bioinformatics/axolotl.git@main
+pip install pyspark
+pip install git+https://github.com/JGI-Bioinformatics/axolotl.git@main
 ```
 
-Create start-worker-and-wait.sh custom script
+Create start-worker-and-wait.sh custom script (so that we can spawn workers with sbatch instead of having to do a single srun each time)
 ```
-cd $CONDA_PREFIX/bin
-vi start-worker-and-wait.sh 
+vi $SPARK_HOME/sbin/start-worker-and-wait.sh 
 --------------------------------------------------------------------------------
 
 #!/usr/bin/env bash
-$CONDA_PREFIX/bin/spark-3.5.0-bin-hadoop3/sbin/start-worker.sh $@
+$SPARK_HOME/sbin/start-worker.sh $@
 while true
 do
   sleep 10000
 done
 --------------------------------------------------------------------------------
 
-chmod +x start-worker-and-wait.sh
+chmod +x $SPARK_HOME/sbin/start-worker-and-wait.sh
 ```
 
 
