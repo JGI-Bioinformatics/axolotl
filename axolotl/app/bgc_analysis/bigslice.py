@@ -42,7 +42,6 @@ class BigsliceApp(AxlApp):
         print("Calculating cdsDF and cds_to_bgc table...")
         cds_df = cdsDF.fromRawFeatDF(features)
         joined = bgc_df.df.alias("bgc").join(cds_df.df.alias("cds"), [
-            F.col("bgc.file_path") == F.col("cds.file_path"),
             F.col("bgc.source_path") == F.col("cds.source_path"),
             F.col("bgc.seq_id") == F.col("cds.seq_id"),
             F.col("bgc.location.start") <= F.col("cds.location.start"),
