@@ -113,10 +113,11 @@ class cdsDF(ioDF):
 
         return cls(cds_df, override_idx=reindex, keep_idx=(not reindex), sources=[features])
 
-    def translateAAs(self, sequences: NuclSeqDF, translate_all: bool=False):
+    def translateAAs(self, sequences: NuclSeqDF, translate_all: bool=False, default_table: int=-1):
         """
         Given the original NuclSeqDF (i.e., contig sequences), try to translate missing AAs in the cds.
-        If translate_all = True, it will override existing AAs also.
+        If translate_all = True, it will override existing AAs also. default_table: when no 'transl_table'
+        qualifier present in the feature, use this value (-1 will skip translation)
         """
 
         cds_df = self.df
@@ -124,7 +125,7 @@ class cdsDF(ioDF):
         missing_cds = cds_df
         if not translate_all:
             missing_cds = missing_cds.filter("aa_sequence is NULL")
-        missing_cds = missing_cds.fillna(-1, ["transl_table"]).groupBy(["source_path", "seq_id"]).agg(
+        missing_cds = missing_cds.fillna(default_table, ["transl_table"]).groupBy(["source_path", "seq_id"]).agg(
             F.collect_list("idx").alias("row_ids"),
             F.collect_list("location").alias("locations"),
             F.collect_list("transl_table").alias("transl_tables")
