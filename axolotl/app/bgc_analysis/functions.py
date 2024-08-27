@@ -51,12 +51,20 @@ def get_bigslice_features_column(bigslice_model_path: str):
 
 
 def run_hmmscan(sequences: List[Tuple], hmm_db_path: str, num_cpus: int=1,
-        bit_cutoff: float=None, e_cutoff: float=10.0, cat_cutoff: str=None,
+        bit_cutoff: float=None, cat_cutoff: str=None,
         use_unoptimized_hmm: bool=False) -> List[Dict]:
     """
     """
 
     hmm_file = HMMFile(hmm_db_path)
+    hmm_profiles = {
+        hmm.name: {
+            "GA": hmm.cutoffs.gathering1 if hmm.cutoffs.gathering_available else None,
+            "TC": hmm.cutoffs.trusted1 if hmm.cutoffs.trusted_available else None,
+            "NC": hmm.cutoffs.noise1 if hmm.cutoffs.noise_available else None,
+            "length": hmm.M
+        } for hmm in hmm_file
+    }
     try:
         hmm_file = hmm_file.optimized_profiles()
     except ValueError:
@@ -71,25 +79,42 @@ def run_hmmscan(sequences: List[Tuple], hmm_db_path: str, num_cpus: int=1,
         ).digitize(Alphabet.amino()) for idx, aa_seq in sequences
     )
     results = []
-    for tophit in pyhmmscan(sequences_pyhmmer, hmm_file, cpus=num_cpus, T=bit_cutoff, E=e_cutoff, bit_cutoffs=cat_cutoff):
+    for tophit in pyhmmscan(sequences_pyhmmer, hmm_file, cpus=num_cpus, T=bit_cutoff, bit_cutoffs=cat_cutoff):
         for hit in tophit:
-            results.append({
-                "query_name": tophit.query_name.decode("utf-8"),
-                "query_from": hit.best_domain.alignment.target_from,
-                "query_to": hit.best_domain.alignment.target_to,
-                "query_gaps": [i+1 for i, c in enumerate(str(hit.best_domain.alignment.target_sequence)) if c == '-'],
-                "hmm_acc": (hit.accession or bytes("", "utf-8")).decode("utf-8"),
-                "hmm_name": (hit.name or bytes("", "utf-8")).decode("utf-8"),
-                "hmm_from": hit.best_domain.alignment.hmm_from,
-                "hmm_to": hit.best_domain.alignment.hmm_to,
-                "hmm_gaps":  [i+1 for i, c in enumerate(str(hit.best_domain.alignment.hmm_sequence)) if c == '.'],
-                "bitscore": hit.best_domain.score
-            })
+            for domain in hit.domains:
+                if cat_cutoff:
+                    if cat_cutoff == "gathering":
+                        if domain.score < hmm_profiles[hit.name]["GA"]:
+                            continue
+                    elif cat_cutoff == "trusted":
+                        if domain.score < hmm_profiles[hit.name]["TC"]:
+                            continue
+                    elif cat_cutoff == "noise":
+                        if domain.score < hmm_profiles[hit.name]["NC"]:
+                            continue
+                    else:
+                        raise ValueError("cat_cutoff={} not recognized!".format(cat_cutoff))
+                elif bit_cutoff:
+                    if domain.score < bit_cutoff:
+                        continue
+                # else: standard e_cutoff=10.0                    
+                results.append({
+                    "query_name": tophit.query_name.decode("utf-8"),
+                    "query_from": domain.alignment.target_from,
+                    "query_to": domain.alignment.target_to,
+                    "query_gaps": [i+1 for i, c in enumerate(str(domain.alignment.target_sequence)) if c == '-'],
+                    "hmm_acc": (hit.accession or bytes("", "utf-8")).decode("utf-8"),
+                    "hmm_name": (hit.name or bytes("", "utf-8")).decode("utf-8"),
+                    "hmm_from": domain.alignment.hmm_from,
+                    "hmm_to": domain.alignment.hmm_to,
+                    "hmm_gaps":  [i+1 for i, c in enumerate(str(domain.alignment.hmm_sequence)) if c == '.'],
+                    "bitscore": domain.score
+                })
     return results
 
 
 def scan_cdsDF(cds_df: cdsDF, hmm_db_path: str, num_cpus: int=1,
-        bit_cutoff: float=None, e_cutoff: float=10.0, cat_cutoff: str=None,
+        bit_cutoff: float=None, cat_cutoff: str=None,
         use_unoptimized_hmm: bool=False) -> DataFrame:
     """
     """
@@ -104,7 +129,6 @@ def scan_cdsDF(cds_df: cdsDF, hmm_db_path: str, num_cpus: int=1,
             [(row.name, row.aa_sequence)], hmm_db_path,
             num_cpus=num_cpus,
             bit_cutoff=bit_cutoff,
-            e_cutoff=e_cutoff,
             cat_cutoff=cat_cutoff,
             use_unoptimized_hmm=use_unoptimized_hmm
         )
