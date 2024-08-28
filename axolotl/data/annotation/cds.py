@@ -82,7 +82,7 @@ class cdsDF(ioDF):
             ).rstrip("*")
 
     @classmethod
-    def fromRawFeatDF(cls, features: RawFeatDF, reindex: bool=True):
+    def fromRawFeatDF(cls, features: RawFeatDF, reindex: bool=False):
         """
         the primary class method to use for generating a cdsDF given a previously-parsed RawFeatDF.
         This method will filter all rows in the RawFeatDF with type=='CDS' and extract CDS-specific
@@ -91,7 +91,7 @@ class cdsDF(ioDF):
         with the RawFeatDF, and that the 'aa_sequence' qualifier in the original feature is None. Remaining
         feature qualifiers will be stored as 'other_qualifiers'.
 
-        By default, the resulting cdsDF will have its own 'idx' recalculated (reindex=True).
+        By default, the resulting cdsDF will retain the original 'idx' of the feature (reindex=False).
         """
 
         cds_df = features.df.filter("type = 'CDS'")\

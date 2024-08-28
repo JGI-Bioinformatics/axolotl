@@ -70,13 +70,13 @@ class bgcDF(ioDF):
         return True
 
     @classmethod
-    def fromRawFeatDF(cls, features: RawFeatDF, source_type: str="antismash", reindex: bool=True):
+    def fromRawFeatDF(cls, features: RawFeatDF, source_type: str="antismash", reindex: bool=False):
         """
         the primary class method to use for generating a bgcDF given a previously-parsed RawFeatDF. By default, it will parse
         for antiSMASH-type BGCs (encoded as a "region" in the gbk file). Use source_type == "smc" if the BGC features come
         from the SMC database's (https://smc.jgi.doe.gov/) GFF3 files.
 
-        By default, the resulting bgcDF will have its own 'idx' recalculated (reindex=True).
+        By default, the resulting bgcDF will retain the original 'idx' of the feature (reindex=False).
         """
         
         if source_type == "antismash":
