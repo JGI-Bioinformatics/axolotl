@@ -70,7 +70,8 @@ class bgcDF(ioDF):
         return True
 
     @classmethod
-    def fromRawFeatDF(cls, features: RawFeatDF, source_type: str="antismash", reindex: bool=False):
+    def fromRawFeatDF(cls, features: RawFeatDF, source_type: str="antismash", reindex: bool=False,
+                     kw_type=None, kw_classes=None):
         """
         the primary class method to use for generating a bgcDF given a previously-parsed RawFeatDF. By default, it will parse
         for antiSMASH-type BGCs (encoded as a "region" in the gbk file). Use source_type == "smc" if the BGC features come
@@ -107,6 +108,22 @@ class bgcDF(ioDF):
                     "other_qualifiers" : [q for q in row.qualifiers if q.key not in ["BGC_Class", "contig_edge"]]
             }).toDF(cls.getSchema()).filter((F.size(F.col("classes")) > 0)) # to exclude 'cluster' features that are not a BGC
 
+        elif source_type == "custom":
+            if not kw_type or not  kw_classes:
+                raise Exception("provided source_type='custom' but kw_type or kw_classes is None")
+            df = features.df.filter("type = '{}'".format(kw_type))\
+                .rdd.map(lambda row: {
+                    "idx" : row.idx,
+                    "file_path" : row.file_path,
+                    "source_path" : row.source_path,
+                    "seq_id" : row.seq_id,
+                    "location" : RawFeatDF.getSimpleLocation(row.location),
+                    "nt_seq" : None,
+                    "classes" : ([q.values for q in row.qualifiers if q.key == kw_classes][0:1] or [[]])[0],
+                    "on_contig_edge" : None,
+                    "other_qualifiers" : [q for q in row.qualifiers if q.key not in [kw_classes]]
+            }).toDF(cls.getSchema()).filter((F.size(F.col("classes")) > 0))
+            
         else:
             raise Exception("unrecognized source_type: '{}'".format(source_type))
 
