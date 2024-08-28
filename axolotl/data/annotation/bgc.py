@@ -71,7 +71,7 @@ class bgcDF(ioDF):
 
     @classmethod
     def fromRawFeatDF(cls, features: RawFeatDF, source_type: str="antismash", reindex: bool=False,
-                     kw_type=None, kw_classes=None):
+                     kw_type: str=None, kw_classes: str=None):
         """
         the primary class method to use for generating a bgcDF given a previously-parsed RawFeatDF. By default, it will parse
         for antiSMASH-type BGCs (encoded as a "region" in the gbk file). Use source_type == "smc" if the BGC features come

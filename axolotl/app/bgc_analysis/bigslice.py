@@ -28,13 +28,13 @@ class BigsliceApp(AxlApp):
             "cds_to_bgc": RelationDF
         }
 
-    def _creationFunc(self, features: RawFeatDF, source_type: str="antismash", kw_type=None, kw_classes=None):
+    def _creationFunc(self, features: RawFeatDF, source_type: str="antismash", kw_type: str=None, kw_classes: str=None):
         """
         extract bgc_df, cds_df and build cds_to_bgc dataframe that will act as BigsliceApp's core data
         """
 
         print("Extracting & saving bgcDF from RawFeatDF...")
-        bgc_df = bgcDF.fromRawFeatDF(features, source_type = source_type, kw_type=None, kw_classes=None)
+        bgc_df = bgcDF.fromRawFeatDF(features, source_type = source_type, kw_type = kw_type, kw_classes = kw_classes)
         self._setData("bgc", bgc_df)
         self._saveData("bgc")
         bgc_df = self._getData("bgc")  
