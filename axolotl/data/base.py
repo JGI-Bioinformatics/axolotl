@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from os import path
 from typing import Tuple, Dict, List
 import json
+import warnings
 
 from pyspark.sql import DataFrame, Row
 from pyspark.sql import functions as F
@@ -138,7 +139,15 @@ class AxlDF(ABC):
         """
         reads a previously-written AxlDF instance
         """
-        spark, sc = get_spark_session_and_context()      
+        spark, sc = get_spark_session_and_context()
+
+        path_obj = parse_path_type(src_parquet)
+        if path_obj["type"] in ["s3", "gs", "hdfs"]: # temp. workaround
+            warnings.warn("File system is not supported, will ignore the metadata and create a new Object")
+            df = spark.read.schema(cls.getSchema()).parquet(src_parquet)
+            if num_partitions:
+                df =  df.repartition(num_partitions)
+            return cls(df, keep_idx=True)
 
         metadata_path = path.join(src_parquet, ".axolotl_metadata.json")
         if not check_file_exists(metadata_path):
@@ -167,6 +176,21 @@ class AxlDF(ABC):
         'fragment' files and a corresponding .axolotl_metadata.json file to support loading back into the
         correct AxlDF object.
         """
+
+        path_obj = parse_path_type(parquet_file_path)
+        if path_obj["type"] in ["s3", "gs", "hdfs"]: # temp. workaround
+            warnings.warn("File system is not supported, will ignore the metadata and saves only the Parquet")
+            df = self.df
+            if num_partitions:
+                df = df.repartition(num_partitions)
+            if overwrite:
+                df.persist() # need this because we're overriding the source parquet file
+                df.count()
+                df.write.mode("overwrite").option("schema", self.__class__.getSchema()).parquet(parquet_file_path)
+            else:
+                df.write.option("schema", self.__class__.getSchema()).parquet(parquet_file_path)
+            return
+
         if check_file_exists(parquet_file_path):
             if overwrite:
                 # check if need to update the DF
