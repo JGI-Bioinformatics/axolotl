@@ -8,7 +8,7 @@ from pyspark.sql import DataFrame, Row
 from pyspark.sql import functions as F
 from pyspark.sql import types as T
 
-from axolotl.utils.file import check_file_exists, fopen
+from axolotl.utils.file import check_file_exists, fopen, parse_path_type
 from axolotl.utils.spark import get_spark_session_and_context
 
 
