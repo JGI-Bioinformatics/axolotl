@@ -133,7 +133,7 @@ def scan_cdsDF(cds_df: cdsDF, hmm_db_path: str, num_cpus: int=1,
             num_cpus=num_cpus,
             bit_cutoff=bit_cutoff,
             cat_cutoff=cat_cutoff,
-            include_only: include_only,
+            include_only=include_only,
             use_unoptimized_hmm=use_unoptimized_hmm
         )
     ).toDF()
