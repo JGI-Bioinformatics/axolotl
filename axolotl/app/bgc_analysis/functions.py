@@ -51,12 +51,22 @@ def get_bigslice_features_column(bigslice_model_path: str):
 
 
 def run_hmmscan(sequences: List[Tuple], hmm_db_path: str, num_cpus: int=1,
-        bit_cutoff: float=None, cat_cutoff: str=None,
+        bit_cutoff: float=None, cat_cutoff: str=None, include_only: List[str]=[],
         use_unoptimized_hmm: bool=False) -> List[Dict]:
     """
     """
 
     hmm_file = HMMFile(hmm_db_path)
+    try:
+        hmm_file = hmm_file.optimized_profiles()
+    except ValueError:
+        if use_unoptimized_hmm:
+            warnings.warn("trying to use an unoptimized HMM profile ({})!!".format(hmm_db_path))
+        else:
+            raise ValueError("trying to use an unoptimized HMM profile ({})!! Set 'use_unoptimized_hmm'=True to ignore this error.".format(hmm_db_path))
+
+    if len(include_only) > 0:
+        hmm_file = [hmm for hmm in hmm_file if hmm.name.decode("utf-8") in include_only]
     hmm_profiles = {
         hmm.name: {
             "GA": hmm.cutoffs.gathering1 if hmm.cutoffs.gathering_available else None,
@@ -65,13 +75,6 @@ def run_hmmscan(sequences: List[Tuple], hmm_db_path: str, num_cpus: int=1,
             "length": hmm.M
         } for hmm in hmm_file
     }
-    try:
-        hmm_file = hmm_file.optimized_profiles()
-    except ValueError:
-        if use_unoptimized_hmm:
-            warnings.warn("trying to use an unoptimized HMM profile ({})!!".format(hmm_db_path))
-        else:
-            raise ValueError("trying to use an unoptimized HMM profile ({})!! Set 'use_unoptimized_hmm'=True to ignore this error.".format(hmm_db_path))
     sequences_pyhmmer = (
         TextSequence(
             name=bytes(idx, "utf-8"),
@@ -114,7 +117,7 @@ def run_hmmscan(sequences: List[Tuple], hmm_db_path: str, num_cpus: int=1,
 
 
 def scan_cdsDF(cds_df: cdsDF, hmm_db_path: str, num_cpus: int=1,
-        bit_cutoff: float=None, cat_cutoff: str=None,
+        bit_cutoff: float=None, cat_cutoff: str=None, include_only: List[str]=[],
         use_unoptimized_hmm: bool=False) -> DataFrame:
     """
     """
@@ -130,6 +133,7 @@ def scan_cdsDF(cds_df: cdsDF, hmm_db_path: str, num_cpus: int=1,
             num_cpus=num_cpus,
             bit_cutoff=bit_cutoff,
             cat_cutoff=cat_cutoff,
+            include_only: include_only,
             use_unoptimized_hmm=use_unoptimized_hmm
         )
     ).toDF()
